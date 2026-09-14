@@ -1,6 +1,6 @@
 # Referee Fixture Hub
 
-All your referee fixtures in one place. A mobile-first Progressive Web App for consolidating match appointments from multiple assigning platforms.
+All your referee fixtures in one place from multiple locations. A mobile-first Progressive Web App for consolidating match appointments from multiple assigning platforms.
 
 ## Features
 
