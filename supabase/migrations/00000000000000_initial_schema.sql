@@ -156,7 +156,7 @@ CREATE TABLE plan_entitlements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     plan_name TEXT NOT NULL,
     feature_id UUID NOT NULL REFERENCES feature_definitions(id) ON DELETE CASCADE,
-    limit INTEGER,
+    limit_value INTEGER,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(plan_name, feature_id)

@@ -9,13 +9,26 @@ import {
   AlertTriangle, 
   RefreshCw,
   ChevronLeft,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input"
 import type { SourceConnection, SourceDefinition } from "@/types"
+
+interface TestResult {
+  fixturesFound: number
+  fixtures: Array<{
+    uid: string
+    summary: string
+    start: string
+    end: string
+    location?: string
+  }>
+  error?: string
+}
 
 const mockSources: (SourceConnection & { definition: SourceDefinition })[] = [
   {
@@ -123,6 +136,30 @@ function getStatusIcon(status: string) {
 
 export default function SourcesPage() {
   const [sources] = useState(mockSources)
+  const [testUrl, setTestUrl] = useState("https://app.assignr.com/icalendar/accounts/dbadfe2523e2d78c1464e8bef7235f0b/733635.ics")
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
+
+  async function handleTest() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/test-feed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: testUrl })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setTestResult({ fixturesFound: 0, fixtures: [], error: data.error || 'Failed' })
+      } else {
+        setTestResult(data)
+      }
+    } catch (err) {
+      setTestResult({ fixturesFound: 0, fixtures: [], error: err instanceof Error ? err.message : 'Unknown error' })
+    }
+    setTesting(false)
+  }
 
   return (
     <div className="min-h-screen pb-8 bg-background">
@@ -140,6 +177,53 @@ export default function SourcesPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-6">
+        {/* Test Feed */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Test iCalendar Feed
+            </h2>
+            <Input
+              value={testUrl}
+              onChange={(e) => setTestUrl(e.target.value)}
+              placeholder="Paste iCalendar URL..."
+              className="text-sm"
+            />
+            <Button 
+              onClick={handleTest} 
+              disabled={testing || !testUrl}
+              className="w-full"
+              size="sm"
+            >
+              {testing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+              {testing ? 'Testing...' : 'Test Feed'}
+            </Button>
+
+            {testResult && (
+              <div className="text-sm space-y-2">
+                {testResult.error ? (
+                  <p className="text-red-500">{testResult.error}</p>
+                ) : (
+                  <>
+                    <p className="text-green-600 font-medium">
+                      Found {testResult.fixturesFound} fixtures
+                    </p>
+                    {testResult.fixtures.map((f, i) => (
+                      <div key={i} className="bg-muted p-2 rounded text-xs">
+                        <p className="font-medium">{f.summary}</p>
+                        <p className="text-muted-foreground">
+                          {new Date(f.start).toLocaleString()}
+                        </p>
+                        {f.location && <p className="text-muted-foreground">{f.location}</p>}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Connected Sources */}
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
@@ -179,11 +263,21 @@ export default function SourcesPage() {
                 </div>
 
                 <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button variant="outline" size="sm" className="flex-1" disabled>
                     <RefreshCw className="w-4 h-4 mr-1" />
                     Sync Now
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => {
+                      setTestUrl('https://app.assignr.com/icalendar/accounts/dbadfe2523e2d78c1464e8bef7235f0b/733635.ics')
+                      handleTest()
+                    }}
+                    disabled={testing}
+                  >
+                    {testing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
                     Test
                   </Button>
                 </div>
