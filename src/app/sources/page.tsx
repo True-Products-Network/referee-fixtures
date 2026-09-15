@@ -198,9 +198,8 @@ export default function SourcesPage() {
   }
 
   const connectedSources = sources
-  const availableDefs = definitions.filter(d =>
-    !connectedSources.some(s => s.source_definition_id === d.id)
-  )
+  // Allow multiple connections per platform - show all active definitions
+  const availableDefs = definitions
 
   if (loading) {
     return (
