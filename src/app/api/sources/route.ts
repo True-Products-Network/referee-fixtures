@@ -7,25 +7,29 @@ export async function GET() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    console.log('API: User:', user?.id || 'none')
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get user's tenant
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('tenant_id')
       .eq('id', user.id)
-      .single() as { data: { tenant_id: string } | null; error: Error | null }
+      .single()
 
-    const tenantId = userData?.tenant_id
+    console.log('API: User data:', userData, 'Error:', userError)
 
-    // Get all source definitions
+    // Get all source definitions (no RLS, should always work)
     const { data: definitions, error: defError } = await supabase
       .from('source_definitions')
       .select('*')
       .eq('is_active', true)
-      .order('sort_order', { ascending: true }) as { data: any[] | null; error: Error | null }
+      .order('sort_order', { ascending: true })
+
+    console.log('API: Definitions:', definitions?.length || 0, 'Error:', defError)
 
     if (defError) throw defError
 
@@ -38,7 +42,9 @@ export async function GET() {
       `)
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .order('created_at', { ascending: false }) as { data: any[] | null; error: Error | null }
+      .order('created_at', { ascending: false })
+
+    console.log('API: Sources:', sources?.length || 0, 'Error:', srcError)
 
     if (srcError) throw srcError
 
@@ -47,6 +53,7 @@ export async function GET() {
       sources: sources || [],
     })
   } catch (error) {
+    console.error('API Error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

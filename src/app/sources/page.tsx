@@ -59,6 +59,7 @@ export default function SourcesPage() {
   const [sources, setSources] = useState<SourceWithDefinition[]>([])
   const [definitions, setDefinitions] = useState<SourceDefinition[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -78,6 +79,7 @@ export default function SourcesPage() {
 
   const fetchSources = useCallback(async () => {
     try {
+      setError(null)
       const res = await fetch('/api/sources')
       console.log('API response status:', res.status)
       if (res.ok) {
@@ -90,9 +92,11 @@ export default function SourcesPage() {
       } else {
         const errorData = await res.json()
         console.error('API error:', errorData)
+        setError(errorData.error || `Failed to load: ${res.status}`)
       }
     } catch (err) {
       console.error('Failed to fetch sources:', err)
+      setError(err instanceof Error ? err.message : 'Network error')
     } finally {
       setLoading(false)
     }
@@ -232,6 +236,13 @@ export default function SourcesPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-6">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+            <p className="font-medium">Error loading data</p>
+            <p>{error}</p>
+          </div>
+        )}
+        
         {/* Add Source Dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
