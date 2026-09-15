@@ -79,10 +79,17 @@ export default function SourcesPage() {
   const fetchSources = useCallback(async () => {
     try {
       const res = await fetch('/api/sources')
+      console.log('API response status:', res.status)
       if (res.ok) {
         const data = await res.json()
+        console.log('API response data:', data)
+        console.log('Definitions:', data.definitions)
+        console.log('Sources:', data.sources)
         setSources(data.sources || [])
         setDefinitions(data.definitions || [])
+      } else {
+        const errorData = await res.json()
+        console.error('API error:', errorData)
       }
     } catch (err) {
       console.error('Failed to fetch sources:', err)
@@ -238,18 +245,29 @@ export default function SourcesPage() {
               <DialogTitle>Add Source Connection</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
+              {/* Debug info */}
+              {definitions.length === 0 && (
+                <div className="text-xs text-red-500 bg-red-50 p-2 rounded">
+                  No platforms loaded. Count: {definitions.length}
+                </div>
+              )}
               <div>
                 <Label>Source Type</Label>
                 <select
                   value={selectedDefId}
                   onChange={(e) => setSelectedDefId(e.target.value)}
-                  className="w-full mt-1 p-2 border rounded-md text-sm"
+                  className="w-full mt-1 p-2 border rounded-md text-sm bg-white dark:bg-gray-900"
                 >
                   <option value="">Select platform...</option>
                   {definitions.map(d => (
                     <option key={d.id} value={d.id}>{d.label}</option>
                   ))}
                 </select>
+                {definitions.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {definitions.length} platforms available
+                  </p>
+                )}
               </div>
               <div>
                 <Label>Name</Label>
