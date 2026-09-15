@@ -96,6 +96,43 @@ export async function POST(request: NextRequest) {
         }, {
           onConflict: 'source_connection_id,source_record_id'
         })
+
+      // Also create/update the fixture record
+      // Parse summary to extract teams: "Team A vs Team B" or "Team A v Team B"
+      const summary = fixture.summary || ''
+      let homeTeam = summary
+      let awayTeam = ''
+      
+      const vsMatch = summary.match(/^(.+?)\s+(?:vs?|VS?|Vs)\s+(.+)$/i)
+      if (vsMatch) {
+        homeTeam = vsMatch[1].trim()
+        awayTeam = vsMatch[2].trim()
+      }
+
+      await supabase
+        .from('fixtures')
+        .upsert({
+          tenant_id: source.tenant_id,
+          user_id: user.id,
+          source_name: source.name,
+          source_record_id: fixture.uid,
+          source_uid: fixture.uid,
+          import_method: 'ical_feed',
+          sport: 'soccer',
+          home_team: homeTeam,
+          away_team: awayTeam,
+          appointment_status: 'confirmed',
+          role: 'referee',
+          timezone: 'America/Chicago',
+          kickoff_start: fixture.start.toISOString(),
+          expected_match_end: fixture.end.toISOString(),
+          venue_id: fixture.location || null,
+          payment_status: 'expected',
+          pre_match_buffer_minutes: 0,
+          post_match_buffer_minutes: 15,
+        }, {
+          onConflict: 'source_record_id'
+        })
     }
 
     // Update source connection
