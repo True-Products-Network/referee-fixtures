@@ -13,7 +13,8 @@ import {
   Loader2,
   Trash2,
   Pencil,
-  X
+  X,
+  LogOut
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useAuth } from "@/hooks/use-auth"
 import type { SourceConnection, SourceDefinition } from "@/lib/supabase/database.types"
 
 interface TestResult {
@@ -56,6 +58,7 @@ function getStatusIcon(status: string) {
 }
 
 export default function SourcesPage() {
+  const { user, loading: authLoading } = useAuth(true)
   const [sources, setSources] = useState<SourceWithDefinition[]>([])
   const [definitions, setDefinitions] = useState<SourceDefinition[]>([])
   const [loading, setLoading] = useState(true)

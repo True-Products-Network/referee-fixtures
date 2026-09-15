@@ -11,12 +11,15 @@ import {
   ChevronRight,
   Database,
   Mail,
-  MapPin
+  MapPin,
+  LogOut,
+  Loader2
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { BottomNav } from "@/components/bottom-nav"
+import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
   {
@@ -46,6 +49,16 @@ const menuItems = [
 ]
 
 export default function MorePage() {
+  const { user, loading: authLoading, signOut } = useAuth(true)
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen pb-20 bg-background">
       <header className="sticky top-0 z-40 bg-background border-b px-4 py-3">
@@ -104,6 +117,16 @@ export default function MorePage() {
             {idx < menuItems.length - 1 && <div className="h-2" />}
           </div>
         ))}
+
+        {/* Sign Out */}
+        <Button 
+          variant="outline" 
+          className="w-full" 
+          onClick={signOut}
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
 
         {/* Version Info */}
         <div className="text-center text-xs text-muted-foreground pt-4">

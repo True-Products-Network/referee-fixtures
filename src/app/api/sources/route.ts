@@ -2,29 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { SourceConnection } from '@/lib/supabase/database.types'
 
-// Demo user ID for development - replace with actual auth when login is implemented
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000000'
-const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001'
-
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Use demo user if not authenticated (development only)
-    const userId = user?.id || DEMO_USER_ID
-    const isDemo = !user
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    console.log('API: User:', userId, isDemo ? '(demo)' : '(authenticated)')
+    // Get user's tenant
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
 
-    // Get all source definitions (no RLS, should always work)
+    const tenantId = userData?.tenant_id
+
+    // Get all source definitions
     const { data: definitions, error: defError } = await supabase
       .from('source_definitions')
       .select('*')
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
-
-    console.log('API: Definitions:', definitions?.length || 0, 'Error:', defError)
 
     if (defError) throw defError
 
@@ -35,11 +36,9 @@ export async function GET(request: NextRequest) {
         *,
         definition:source_definitions(*)
       `)
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
-
-    console.log('API: Sources:', sources?.length || 0, 'Error:', srcError)
 
     if (srcError) throw srcError
 
@@ -61,16 +60,23 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    const userId = user?.id || DEMO_USER_ID
-    const tenantId = DEMO_TENANT_ID
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
 
     const body = await request.json()
 
     const { data, error } = await supabase
       .from('source_connections')
       .insert({
-        tenant_id: tenantId,
-        user_id: userId,
+        tenant_id: userData?.tenant_id || '',
+        user_id: user.id,
         source_definition_id: body.source_definition_id,
         name: body.name,
         connection_method: body.connection_method,
@@ -99,7 +105,9 @@ export async function PATCH(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    const userId = user?.id || DEMO_USER_ID
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const body = await request.json()
 
@@ -111,7 +119,7 @@ export async function PATCH(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .select()
       .single() as { data: SourceConnection | null; error: Error | null }
 
@@ -131,7 +139,9 @@ export async function DELETE(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    const userId = user?.id || DEMO_USER_ID
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const id = request.nextUrl.searchParams.get('id')
     if (!id) {
@@ -142,7 +152,7 @@ export async function DELETE(request: NextRequest) {
       .from('source_connections')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
 
     if (error) throw error
 
