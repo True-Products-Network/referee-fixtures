@@ -2,25 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { SourceConnection } from '@/lib/supabase/database.types'
 
-export async function GET() {
+// Demo user ID for development - replace with actual auth when login is implemented
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000000'
+const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    console.log('API: User:', user?.id || 'none')
+    // Use demo user if not authenticated (development only)
+    const userId = user?.id || DEMO_USER_ID
+    const isDemo = !user
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get user's tenant
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    console.log('API: User data:', userData, 'Error:', userError)
+    console.log('API: User:', userId, isDemo ? '(demo)' : '(authenticated)')
 
     // Get all source definitions (no RLS, should always work)
     const { data: definitions, error: defError } = await supabase
@@ -40,7 +35,7 @@ export async function GET() {
         *,
         definition:source_definitions(*)
       `)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
 
@@ -66,23 +61,16 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single() as { data: { tenant_id: string } | null; error: Error | null }
+    const userId = user?.id || DEMO_USER_ID
+    const tenantId = DEMO_TENANT_ID
 
     const body = await request.json()
 
     const { data, error } = await supabase
       .from('source_connections')
       .insert({
-        tenant_id: userData?.tenant_id || '',
-        user_id: user.id,
+        tenant_id: tenantId,
+        user_id: userId,
         source_definition_id: body.source_definition_id,
         name: body.name,
         connection_method: body.connection_method,
@@ -111,9 +99,7 @@ export async function PATCH(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const userId = user?.id || DEMO_USER_ID
 
     const body = await request.json()
 
@@ -125,7 +111,7 @@ export async function PATCH(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .select()
       .single() as { data: SourceConnection | null; error: Error | null }
 
@@ -145,9 +131,7 @@ export async function DELETE(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const userId = user?.id || DEMO_USER_ID
 
     const id = request.nextUrl.searchParams.get('id')
     if (!id) {
@@ -158,7 +142,7 @@ export async function DELETE(request: NextRequest) {
       .from('source_connections')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
 
     if (error) throw error
 
