@@ -37,6 +37,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       users: {
         Row: {
@@ -78,6 +79,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       fixtures: {
         Row: {
@@ -275,6 +277,139 @@ export interface Database {
           updated_at?: string
           archived_at?: string | null
         }
+        Relationships: []
+      }
+      source_definitions: {
+        Row: {
+          id: string
+          name: string
+          label: string
+          adapter_type: 'api' | 'ical' | 'email' | 'csv' | 'manual'
+          capabilities: string[]
+          is_active: boolean
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          label: string
+          adapter_type: 'api' | 'ical' | 'email' | 'csv' | 'manual'
+          capabilities?: string[]
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          label?: string
+          adapter_type?: 'api' | 'ical' | 'email' | 'csv' | 'manual'
+          capabilities?: string[]
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      source_connections: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          source_definition_id: string
+          name: string
+          connection_method: 'oauth' | 'api_token' | 'ical_feed' | 'email' | 'manual'
+          credentials_encrypted: string | null
+          feed_url_encrypted: string | null
+          refresh_interval_minutes: number
+          last_successful_check: string | null
+          next_planned_check: string | null
+          imported_record_count: number
+          error_count: number
+          status: 'active' | 'error' | 'paused' | 'pending'
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          source_definition_id: string
+          name: string
+          connection_method: 'oauth' | 'api_token' | 'ical_feed' | 'email' | 'manual'
+          credentials_encrypted?: string | null
+          feed_url_encrypted?: string | null
+          refresh_interval_minutes?: number
+          last_successful_check?: string | null
+          next_planned_check?: string | null
+          imported_record_count?: number
+          error_count?: number
+          status?: 'active' | 'error' | 'paused' | 'pending'
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          source_definition_id?: string
+          name?: string
+          connection_method?: 'oauth' | 'api_token' | 'ical_feed' | 'email' | 'manual'
+          credentials_encrypted?: string | null
+          feed_url_encrypted?: string | null
+          refresh_interval_minutes?: number
+          last_successful_check?: string | null
+          next_planned_check?: string | null
+          imported_record_count?: number
+          error_count?: number
+          status?: 'active' | 'error' | 'paused' | 'pending'
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      source_records: {
+        Row: {
+          id: string
+          tenant_id: string
+          source_connection_id: string
+          source_record_id: string
+          source_uid: string | null
+          raw_payload: Json
+          import_method: string
+          imported_at: string
+          version: number
+          is_processed: boolean
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          source_connection_id: string
+          source_record_id: string
+          source_uid?: string | null
+          raw_payload?: Json
+          import_method: string
+          imported_at?: string
+          version?: number
+          is_processed?: boolean
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          source_connection_id?: string
+          source_record_id?: string
+          source_uid?: string | null
+          raw_payload?: Json
+          import_method?: string
+          imported_at?: string
+          version?: number
+          is_processed?: boolean
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -287,4 +422,37 @@ export interface Database {
       [_ in never]: never
     }
   }
+}
+
+// Types for source_definitions table
+export interface SourceDefinition {
+  id: string
+  name: string
+  label: string
+  adapter_type: 'api' | 'ical' | 'email' | 'csv' | 'manual'
+  capabilities: string[]
+  is_active: boolean
+  sort_order: number
+  created_at: string
+}
+
+// Types for source_connections table
+export interface SourceConnection {
+  id: string
+  tenant_id: string
+  user_id: string
+  source_definition_id: string
+  name: string
+  connection_method: 'oauth' | 'api_token' | 'ical_feed' | 'email' | 'manual'
+  credentials_encrypted: string | null
+  feed_url_encrypted: string | null
+  refresh_interval_minutes: number
+  last_successful_check: string | null
+  next_planned_check: string | null
+  imported_record_count: number
+  error_count: number
+  status: 'active' | 'error' | 'paused' | 'pending'
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }
