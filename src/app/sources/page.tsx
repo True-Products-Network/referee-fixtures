@@ -201,6 +201,7 @@ export default function SourcesPage() {
         await fetchSources()
       } else {
         setError(`Failed to add: ${data.error || res.statusText}`)
+        console.error('Full error response:', data)
       }
     } catch (err) {
       console.error('Add failed:', err)
