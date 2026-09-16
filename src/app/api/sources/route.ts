@@ -79,7 +79,11 @@ export async function POST(request: NextRequest) {
 
     if (userError) {
       console.error('User lookup error:', userError)
-      return NextResponse.json({ error: 'User not found in database' }, { status: 400 })
+      return NextResponse.json({ error: `User lookup failed: ${userError.message}` }, { status: 400 })
+    }
+    
+    if (!userData?.tenant_id) {
+      return NextResponse.json({ error: 'User has no tenant_id assigned' }, { status: 400 })
     }
 
     const body = await request.json()
