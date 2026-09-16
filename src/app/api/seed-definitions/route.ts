@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-import type { Database } from '@/lib/supabase/database.types'
+interface SeedDefinition {
+  name: string
+  label: string
+  adapter_type: 'api' | 'ical' | 'email' | 'csv' | 'manual'
+  capabilities: string[]
+  sort_order: number
+}
 
-type SourceDefinitionInsert = Database['public']['Tables']['source_definitions']['Insert']
-
-const DEFAULT_DEFINITIONS: SourceDefinitionInsert[] = [
+const DEFAULT_DEFINITIONS: SeedDefinition[] = [
   { name: 'assignr', label: 'Assignr', adapter_type: 'ical', capabilities: ['read','ical_feed'], sort_order: 1 },
   { name: 'arbiter', label: 'ArbiterSports', adapter_type: 'ical', capabilities: ['read','ical_feed'], sort_order: 2 },
   { name: 'eventlink', label: 'EventLink', adapter_type: 'ical', capabilities: ['read','ical_feed'], sort_order: 3 },
@@ -28,7 +32,7 @@ export async function POST(request: NextRequest) {
     for (const def of DEFAULT_DEFINITIONS) {
       const { data, error } = await supabase
         .from('source_definitions')
-        .upsert(def, { onConflict: 'name' })
+        .upsert(def as any, { onConflict: 'name' })
         .select()
         .single()
       
@@ -63,7 +67,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Just check what's in the table
     const { data, error } = await supabase
       .from('source_definitions')
       .select('*')
