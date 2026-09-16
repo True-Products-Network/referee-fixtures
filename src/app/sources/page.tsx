@@ -413,8 +413,8 @@ export default function SourcesPage() {
                   {source.error_count ? (
                     <span className="text-red-500">Errors: {source.error_count}</span>
                   ) : null}
-                  {source.last_sync_at && (
-                    <span>Last sync: {new Date(source.last_sync_at).toLocaleDateString()}</span>
+                  {source.last_successful_check && (
+                    <span>Last sync: {new Date(source.last_successful_check).toLocaleDateString()}</span>
                   )}
                 </div>
 

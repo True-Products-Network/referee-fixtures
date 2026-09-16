@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const DEFAULT_DEFINITIONS = [
+import type { Database } from '@/lib/supabase/database.types'
+
+type SourceDefinitionInsert = Database['public']['Tables']['source_definitions']['Insert']
+
+const DEFAULT_DEFINITIONS: SourceDefinitionInsert[] = [
   { name: 'assignr', label: 'Assignr', adapter_type: 'ical', capabilities: ['read','ical_feed'], sort_order: 1 },
   { name: 'arbiter', label: 'ArbiterSports', adapter_type: 'ical', capabilities: ['read','ical_feed'], sort_order: 2 },
   { name: 'eventlink', label: 'EventLink', adapter_type: 'ical', capabilities: ['read','ical_feed'], sort_order: 3 },
