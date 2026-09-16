@@ -90,8 +90,12 @@ export default function SourcesPage() {
         console.log('API response data:', data)
         console.log('Definitions:', data.definitions)
         console.log('Sources:', data.sources)
+        console.log('Debug:', data.debug)
         setSources(data.sources || [])
         setDefinitions(data.definitions || [])
+        if (data.debug) {
+          setError(`Debug: user=${data.debug.userId?.slice(0,8)}..., tenant=${data.debug.tenantId?.slice(0,8)}..., defs=${data.debug.definitionsCount}, sources=${data.debug.sourcesCount}`)
+        }
       } else {
         const errorData = await res.json()
         console.error('API error:', errorData)

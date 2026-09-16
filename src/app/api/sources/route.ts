@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
 
+    console.log('Source definitions query result:', { definitions, defError })
+
     if (defError) throw defError
 
     // Get user's source connections with definitions
@@ -45,6 +47,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       definitions: definitions || [],
       sources: sources || [],
+      debug: {
+        userId: user.id,
+        tenantId,
+        definitionsCount: definitions?.length || 0,
+        sourcesCount: sources?.length || 0,
+      }
     })
   } catch (error) {
     console.error('API Error:', error)
