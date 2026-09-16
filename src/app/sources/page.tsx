@@ -14,7 +14,8 @@ import {
   Trash2,
   Pencil,
   X,
-  LogOut
+  LogOut,
+  Database
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -66,6 +67,8 @@ export default function SourcesPage() {
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [seeding, setSeeding] = useState(false)
+  const [seedResult, setSeedResult] = useState<string | null>(null)
 
   // Add source form state
   const [addOpen, setAddOpen] = useState(false)
@@ -83,6 +86,7 @@ export default function SourcesPage() {
   const fetchSources = useCallback(async () => {
     try {
       setError(null)
+      setSeedResult(null)
       const res = await fetch('/api/sources')
       console.log('API response status:', res.status)
       if (res.ok) {
@@ -93,8 +97,8 @@ export default function SourcesPage() {
         console.log('Debug:', data.debug)
         setSources(data.sources || [])
         setDefinitions(data.definitions || [])
-        if (data.debug) {
-          setError(`Debug: user=${data.debug.userId?.slice(0,8)}..., tenant=${data.debug.tenantId?.slice(0,8)}..., defs=${data.debug.definitionsCount}, sources=${data.debug.sourcesCount}`)
+        if (data.debug && data.debug.definitionsCount === 0) {
+          setError('No source platforms found. Click "Seed Platforms" below to add them.')
         }
       } else {
         const errorData = await res.json()
@@ -112,6 +116,24 @@ export default function SourcesPage() {
   useEffect(() => {
     fetchSources()
   }, [fetchSources])
+
+  async function handleSeedDefinitions() {
+    setSeeding(true)
+    setSeedResult(null)
+    try {
+      const res = await fetch('/api/seed-definitions', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setSeedResult(`Success! ${data.message}`)
+        await fetchSources()
+      } else {
+        setSeedResult(`Error: ${data.error || 'Failed to seed'}`)
+      }
+    } catch (err) {
+      setSeedResult(`Error: ${err instanceof Error ? err.message : 'Network error'}`)
+    }
+    setSeeding(false)
+  }
 
   async function handleTest(source: SourceWithDefinition) {
     setTestingId(source.id)
@@ -247,6 +269,23 @@ export default function SourcesPage() {
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
             <p className="font-medium">Error loading data</p>
             <p>{error}</p>
+            {definitions.length === 0 && (
+              <Button 
+                onClick={handleSeedDefinitions} 
+                disabled={seeding}
+                className="mt-2 w-full"
+                variant="outline"
+              >
+                {seeding ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
+                {seeding ? 'Seeding...' : 'Seed Platforms'}
+              </Button>
+            )}
+          </div>
+        )}
+        
+        {seedResult && (
+          <div className={`px-4 py-3 rounded-md text-sm ${seedResult.includes('Success') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+            {seedResult}
           </div>
         )}
         
@@ -363,30 +402,23 @@ export default function SourcesPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Method</span>
-                    <span className="capitalize">{source.connection_method.replace('_', ' ')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Imported</span>
-                    <span>{source.imported_record_count} fixtures</span>
-                  </div>
-                  {source.last_successful_check && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Last sync</span>
-                      <span>{new Date(source.last_successful_check).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {source.feed_url_encrypted && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">URL</span>
-                      <span className="truncate max-w-[200px] text-xs">{source.feed_url_encrypted}</span>
-                    </div>
+                {source.feed_url_encrypted && (
+                  <p className="text-xs text-muted-foreground mt-2 truncate">
+                    {source.feed_url_encrypted}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+                  <span>Imported: {source.imported_record_count || 0}</span>
+                  {source.error_count ? (
+                    <span className="text-red-500">Errors: {source.error_count}</span>
+                  ) : null}
+                  {source.last_sync_at && (
+                    <span>Last sync: {new Date(source.last_sync_at).toLocaleDateString()}</span>
                   )}
                 </div>
 
-                <div className="flex gap-2 mt-4">
+                <div className="flex gap-2 mt-3">
                   <Button
                     variant="outline"
                     size="sm"
@@ -395,7 +427,7 @@ export default function SourcesPage() {
                     disabled={syncingId === source.id}
                   >
                     {syncingId === source.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-                    {syncingId === source.id ? 'Syncing...' : 'Sync Now'}
+                    Sync
                   </Button>
                   <Button
                     variant="outline"
