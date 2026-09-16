@@ -98,7 +98,7 @@ export default function SourcesPage() {
         setSources(data.sources || [])
         setDefinitions(data.definitions || [])
         if (data.debug && data.debug.definitionsCount === 0) {
-          setError('No source platforms found. Click "Seed Platforms" below to add them.')
+          setError('No source platforms found in database. Run the SQL in Supabase or click "Seed Platforms".')
         }
       } else {
         const errorData = await res.json()

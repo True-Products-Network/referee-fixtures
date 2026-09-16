@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
     const { data: definitions, error: defError } = await supabase
       .from('source_definitions')
       .select('*')
-      .eq('is_active', true)
       .order('sort_order', { ascending: true })
 
     console.log('Source definitions query result:', { definitions, defError })
