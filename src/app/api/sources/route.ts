@@ -71,17 +71,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('tenant_id')
       .eq('id', user.id)
       .single()
 
+    if (userError) {
+      console.error('User lookup error:', userError)
+      return NextResponse.json({ error: 'User not found in database' }, { status: 400 })
+    }
+
     const body = await request.json()
     console.log('POST /api/sources body:', body)
 
     const insertData = {
-      tenant_id: userData?.tenant_id || '00000000-0000-0000-0000-000000000001',
+      tenant_id: userData?.tenant_id,
       user_id: user.id,
       source_definition_id: body.source_definition_id,
       name: body.name,
@@ -107,8 +112,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
+    console.error('POST /api/sources error:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { error: error instanceof Error ? error.message : 'Unknown error', stack: error instanceof Error ? error.stack : undefined },
       { status: 500 }
     )
   }
