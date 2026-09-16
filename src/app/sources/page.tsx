@@ -177,7 +177,9 @@ export default function SourcesPage() {
   async function handleAdd() {
     if (!selectedDefId || !sourceName || !feedUrl) return
     setAdding(true)
+    setError(null)
     try {
+      console.log('Adding source:', { selectedDefId, sourceName, feedUrl })
       const res = await fetch('/api/sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -189,15 +191,20 @@ export default function SourcesPage() {
           refresh_interval_minutes: 60,
         })
       })
+      const data = await res.json()
+      console.log('Add response:', { status: res.status, data })
       if (res.ok) {
         setAddOpen(false)
         setSelectedDefId('')
         setSourceName('')
         setFeedUrl('')
         await fetchSources()
+      } else {
+        setError(`Failed to add: ${data.error || res.statusText}`)
       }
     } catch (err) {
       console.error('Add failed:', err)
+      setError(`Add failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
     setAdding(false)
   }

@@ -78,25 +78,32 @@ export async function POST(request: NextRequest) {
       .single()
 
     const body = await request.json()
+    console.log('POST /api/sources body:', body)
+
+    const insertData = {
+      tenant_id: userData?.tenant_id || '00000000-0000-0000-0000-000000000001',
+      user_id: user.id,
+      source_definition_id: body.source_definition_id,
+      name: body.name,
+      connection_method: body.connection_method || 'ical_feed',
+      feed_url_encrypted: body.feed_url_encrypted,
+      refresh_interval_minutes: body.refresh_interval_minutes || 60,
+      status: 'pending' as const,
+      imported_record_count: 0,
+      error_count: 0,
+    }
+    console.log('Inserting:', insertData)
 
     const { data, error } = await supabase
       .from('source_connections')
-      .insert({
-        tenant_id: userData?.tenant_id || '',
-        user_id: user.id,
-        source_definition_id: body.source_definition_id,
-        name: body.name,
-        connection_method: body.connection_method,
-        feed_url_encrypted: body.feed_url_encrypted,
-        refresh_interval_minutes: body.refresh_interval_minutes || 60,
-        status: 'pending',
-        imported_record_count: 0,
-        error_count: 0,
-      })
+      .insert(insertData)
       .select()
       .single() as { data: SourceConnection | null; error: Error | null }
 
-    if (error) throw error
+    if (error) {
+      console.error('Insert error:', error)
+      throw error
+    }
 
     return NextResponse.json(data)
   } catch (error) {
