@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         awayTeam = vsMatch[2].trim()
       }
 
-      await supabase
+      const { error: fixtureError } = await supabase
         .from('fixtures')
         .upsert({
           tenant_id: source.tenant_id,
@@ -126,13 +126,16 @@ export async function POST(request: NextRequest) {
           timezone: 'America/Chicago',
           kickoff_start: fixture.start.toISOString(),
           expected_match_end: fixture.end.toISOString(),
-          venue_id: fixture.location || null,
           payment_status: 'expected',
           pre_match_buffer_minutes: 0,
           post_match_buffer_minutes: 15,
         }, {
           onConflict: 'source_record_id'
         })
+
+      if (fixtureError) {
+        console.error('Fixture upsert error:', fixtureError)
+      }
     }
 
     // Update source connection
