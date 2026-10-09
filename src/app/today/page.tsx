@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { format, differenceInMinutes, isPast, isToday, isTomorrow, addDays } from "date-fns"
+import { format, differenceInMinutes, isPast, isToday, isTomorrow, addDays, startOfDay } from "date-fns"
 import {
   MapPin,
   Clock,
@@ -16,6 +16,7 @@ import {
   Calendar,
   Loader2,
   RefreshCw,
+  CalendarDays,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -53,21 +54,39 @@ export default function TodayPage() {
   const [nextFixture, setNextFixture] = useState<Fixture | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [travelWarning, setTravelWarning] = useState<string | null>(null)
+  
+  // Date range for upcoming fixtures
+  const [rangeDays, setRangeDays] = useState<number>(30)
+  const [dateRangeLabel, setDateRangeLabel] = useState<string>("Next 30 days")
+  const [showRangePicker, setShowRangePicker] = useState(false)
+
+  const rangeOptions = [
+    { label: "Today", days: 1 },
+    { label: "Next 7 days", days: 7 },
+    { label: "Next 30 days", days: 30 },
+    { label: "Next 90 days", days: 90 },
+    { label: "All future", days: 365 },
+  ]
 
   const fetchFixtures = useCallback(async () => {
     try {
-      const from = new Date().toISOString()
-      const to = addDays(new Date(), 30).toISOString()
+      setLoading(true)
+      // Start from beginning of today so today's fixtures are included
+      const from = startOfDay(new Date()).toISOString()
+      const to = addDays(new Date(), rangeDays).toISOString()
       const res = await fetch(`/api/fixtures?from=${from}&to=${to}`)
       if (res.ok) {
         const data = await res.json()
         const loaded = data.fixtures || []
         setFixtures(loaded)
 
-        // Find next fixture
+        // Find next fixture (first one that hasn't passed)
         const now = new Date()
         const upcoming = loaded
-          .filter((f: Fixture) => !isPast(new Date(f.kickoff_start)) && f.appointment_status !== 'cancelled' && f.appointment_status !== 'declined')
+          .filter((f: Fixture) => {
+            const kickoff = new Date(f.kickoff_start)
+            return kickoff > now && f.appointment_status !== 'cancelled' && f.appointment_status !== 'declined'
+          })
           .sort((a: Fixture, b: Fixture) => new Date(a.kickoff_start).getTime() - new Date(b.kickoff_start).getTime())[0]
         
         setNextFixture(upcoming || null)
@@ -92,7 +111,7 @@ export default function TodayPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [rangeDays])
 
   useEffect(() => {
     fetchFixtures()
@@ -117,7 +136,13 @@ export default function TodayPage() {
     fetchFixtures()
   }
 
-  if (loading) {
+  const selectRange = (days: number, label: string) => {
+    setRangeDays(days)
+    setDateRangeLabel(label)
+    setShowRangePicker(false)
+  }
+
+  if (loading && fixtures.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -143,6 +168,38 @@ export default function TodayPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-4">
+        {/* Date Range Selector */}
+        <div className="relative">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-between"
+            onClick={() => setShowRangePicker(!showRangePicker)}
+          >
+            <span className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" />
+              {dateRangeLabel}
+            </span>
+            <ChevronRight className={`w-4 h-4 transition-transform ${showRangePicker ? 'rotate-90' : ''}`} />
+          </Button>
+          
+          {showRangePicker && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 py-1">
+              {rangeOptions.map((opt) => (
+                <button
+                  key={opt.days}
+                  onClick={() => selectRange(opt.days, opt.label)}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors ${
+                    rangeDays === opt.days ? 'bg-accent font-medium' : ''
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {nextFixture ? (
           <>
             {/* Countdown Card */}
@@ -239,12 +296,16 @@ export default function TodayPage() {
 
             {/* Upcoming Fixtures */}
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Upcoming
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Upcoming
+                </h2>
+                <span className="text-xs text-muted-foreground">
+                  {fixtures.length} fixture{fixtures.length !== 1 ? 's' : ''}
+                </span>
+              </div>
               {fixtures
                 .filter(f => f.id !== nextFixture.id)
-                .slice(0, 5)
                 .map(fixture => (
                   <Link key={fixture.id} href={`/fixtures/${fixture.id}`}>
                     <Card className="cursor-pointer hover:bg-accent/50 transition-colors mb-2">
@@ -277,7 +338,7 @@ export default function TodayPage() {
             <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold mb-2">No upcoming fixtures</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              You have no confirmed or accepted fixtures coming up.
+              You have no confirmed or accepted fixtures in {dateRangeLabel.toLowerCase()}.
             </p>
             <Button asChild>
               <Link href="/sources">Add a Source</Link>
