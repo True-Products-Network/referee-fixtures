@@ -124,6 +124,7 @@ export interface Database {
           travel_time_before_minutes: number | null
           travel_time_after_minutes: number | null
           venue_id: string | null
+          venue_name: string | null
           expected_match_fee: number | null
           travel_fee: number | null
           mileage_reimbursement: number | null
@@ -189,6 +190,7 @@ export interface Database {
           travel_time_before_minutes?: number | null
           travel_time_after_minutes?: number | null
           venue_id?: string | null
+          venue_name?: string | null
           expected_match_fee?: number | null
           travel_fee?: number | null
           mileage_reimbursement?: number | null
@@ -254,6 +256,7 @@ export interface Database {
           travel_time_before_minutes?: number | null
           travel_time_after_minutes?: number | null
           venue_id?: string | null
+          venue_name?: string | null
           expected_match_fee?: number | null
           travel_fee?: number | null
           mileage_reimbursement?: number | null

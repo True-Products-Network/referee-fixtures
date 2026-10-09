@@ -153,12 +153,12 @@ export default function FixtureDetailPage() {
             </div>
 
             {/* Venue */}
-            {fixture.venue_id && (
+            {fixture.venue_name && (
               <div className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
                 <div>
                   <p className="font-medium">Venue</p>
-                  <p className="text-sm text-muted-foreground">{fixture.venue_id}</p>
+                  <p className="text-sm text-muted-foreground">{fixture.venue_name}</p>
                 </div>
               </div>
             )}
@@ -250,7 +250,14 @@ export default function FixtureDetailPage() {
 
         {/* Actions */}
         <div className="flex gap-2">
-          <Button className="flex-1" size="lg">
+          <Button 
+            className="flex-1" 
+            size="lg"
+            onClick={() => {
+              const destination = fixture.venue_name || `${fixture.home_team} vs ${fixture.away_team}`
+              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`, '_blank')
+            }}
+          >
             <Navigation className="w-4 h-4 mr-2" />
             Directions
           </Button>

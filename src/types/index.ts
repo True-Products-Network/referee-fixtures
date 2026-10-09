@@ -223,6 +223,7 @@ export interface Fixture {
   
   // Venue details
   venue_id?: string | null;
+  venue_name?: string | null;
   
   // Financial details
   expected_match_fee?: number | null;

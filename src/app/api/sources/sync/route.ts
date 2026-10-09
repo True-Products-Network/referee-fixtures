@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { parseICS, webcalToHttps } from '@/lib/ical-parser'
+import { parseICS, webcalToHttps, extractTeams, extractRole, extractCompetition, cleanLocation } from '@/lib/ical-parser'
 import type { SourceConnection } from '@/lib/supabase/database.types'
 
 export async function POST(request: NextRequest) {
@@ -97,17 +97,11 @@ export async function POST(request: NextRequest) {
           onConflict: 'source_connection_id,source_record_id'
         })
 
-      // Also create/update the fixture record
-      // Parse summary to extract teams: "Team A vs Team B" or "Team A v Team B"
-      const summary = fixture.summary || ''
-      let homeTeam = summary
-      let awayTeam = ''
-      
-      const vsMatch = summary.match(/^(.+?)\s+(?:vs?|VS?|Vs)\s+(.+)$/i)
-      if (vsMatch) {
-        homeTeam = vsMatch[1].trim()
-        awayTeam = vsMatch[2].trim()
-      }
+      // Extract teams, role, competition from the fixture data
+      const { homeTeam, awayTeam } = extractTeams(fixture.summary || '', fixture.description || '')
+      const role = extractRole(fixture.summary || '', fixture.description || '')
+      const competition = extractCompetition(fixture.summary || '')
+      const location = cleanLocation(fixture.location || '')
 
       const { error: fixtureError } = await supabase
         .from('fixtures')
@@ -119,13 +113,15 @@ export async function POST(request: NextRequest) {
           source_uid: fixture.uid,
           import_method: 'ical_feed',
           sport: 'soccer',
+          competition,
           home_team: homeTeam,
           away_team: awayTeam,
           appointment_status: 'confirmed',
-          role: 'referee',
+          role,
           timezone: 'America/Chicago',
           kickoff_start: fixture.start.toISOString(),
           expected_match_end: fixture.end.toISOString(),
+          venue_name: location || null,
           payment_status: 'expected',
           pre_match_buffer_minutes: 0,
           post_match_buffer_minutes: 15,

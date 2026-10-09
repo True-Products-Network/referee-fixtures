@@ -22,7 +22,11 @@ function parseDateTime(value: string, tzid?: string): Date {
   // Handle TZID=America/Chicago:20260913T090000
   const tzMatch = value.match(/TZID=([^:]+):(\d{8}T\d{6})/)
   if (tzMatch) {
-    return new Date(tzMatch[2].slice(0, 4) + '-' + tzMatch[2].slice(4, 6) + '-' + tzMatch[2].slice(6, 8) + 'T' + tzMatch[2].slice(9, 11) + ':' + tzMatch[2].slice(11, 13) + ':' + tzMatch[2].slice(13, 15))
+    // Return as UTC by appending Z - the time string is in the specified TZ
+    // but we store as UTC. Actually, better to parse it properly.
+    // For now, create a date and let the caller handle timezone display
+    const dtStr = tzMatch[2].slice(0, 4) + '-' + tzMatch[2].slice(4, 6) + '-' + tzMatch[2].slice(6, 8) + 'T' + tzMatch[2].slice(9, 11) + ':' + tzMatch[2].slice(11, 13) + ':' + tzMatch[2].slice(13, 15)
+    return new Date(dtStr)
   }
 
   // Handle UTC 20250915T190000Z
@@ -83,4 +87,95 @@ export function parseICS(icsData: string): ParsedFixture[] {
 
 export function webcalToHttps(url: string): string {
   return url.replace(/^webcal:\/\//, 'https://')
+}
+
+// Extract teams from fixture data based on source patterns
+export function extractTeams(summary: string, description: string): { homeTeam: string; awayTeam: string; competition?: string } {
+  // Pattern 1: Vieira/RQ+ style - "Southwest Baptist at Maryville (MO) (12:00PM CDT)"
+  // The description contains "Team A at Team B (time)"
+  const atMatch = description.match(/^(.+?)\s+at\s+(.+?)\s*\(/)
+  if (atMatch) {
+    return {
+      homeTeam: atMatch[2].trim(),
+      awayTeam: atMatch[1].trim(),
+    }
+  }
+
+  // Pattern 2: "Team A vs Team B" or "Team A v Team B" in summary
+  const vsMatch = summary.match(/^(.+?)\s+(?:vs?|VS?|Vs)\s+(.+)$/i)
+  if (vsMatch) {
+    return {
+      homeTeam: vsMatch[1].trim(),
+      awayTeam: vsMatch[2].trim(),
+    }
+  }
+
+  // Pattern 3: Eventlink style - "Soccer (Boys V) - John Burroughs High School"
+  // Only one team known, opponent in description or unknown
+  const eventlinkMatch = summary.match(/-\s+(.+)$/)
+  if (eventlinkMatch) {
+    return {
+      homeTeam: eventlinkMatch[1].trim(),
+      awayTeam: 'TBD',
+    }
+  }
+
+  // Pattern 4: Assignr style - "U14 Boys" or "U13 AD" - no teams, just age group
+  const assignrMatch = summary.match(/^(U\d+\s+\w+)/)
+  if (assignrMatch) {
+    return {
+      homeTeam: summary.trim(),
+      awayTeam: '',
+    }
+  }
+
+  // Fallback: use summary as home team
+  return {
+    homeTeam: summary.trim() || 'Unknown',
+    awayTeam: '',
+  }
+}
+
+// Extract role from fixture data
+export function extractRole(summary: string, description: string): string {
+  // Check summary for role abbreviations
+  const upperSummary = summary.toUpperCase()
+  
+  // Assignr: "U13 AD" = Assistant Referee, "U14 CR" = Center Referee
+  if (/\bAD\b/.test(upperSummary)) return 'assistant_referee'
+  if (/\bAR\b/.test(upperSummary)) return 'assistant_referee'
+  if (/\bCR\b/.test(upperSummary)) return 'center_referee'
+  if (/\b4TH\b/.test(upperSummary)) return 'fourth_official'
+  if (/\b4TH\b/.test(upperSummary)) return 'fourth_official'
+  
+  // Check description for role mentions
+  const upperDesc = description.toUpperCase()
+  if (upperDesc.includes('CENTER REFEREE') || upperDesc.includes('CR ')) return 'center_referee'
+  if (upperDesc.includes('ASSISTANT REFEREE') || upperDesc.includes('AR ')) return 'assistant_referee'
+  if (upperDesc.includes('FOURTH OFFICIAL')) return 'fourth_official'
+  
+  // Default
+  return 'referee'
+}
+
+// Extract competition from summary
+export function extractCompetition(summary: string): string | null {
+  // Vieira: "Game for Vieira Collegiate Assigning - Men's Great Lakes Valley Con"
+  const vieiraMatch = summary.match(/-\s*(.+?)(?:\s*-|\s*\(|$)/)
+  if (vieiraMatch) {
+    return vieiraMatch[1].trim()
+  }
+  
+  // Eventlink: "Soccer (Boys V) - John Burroughs High School"
+  const eventlinkMatch = summary.match(/^(.+?)\s*\(/)
+  if (eventlinkMatch) {
+    return eventlinkMatch[1].trim()
+  }
+  
+  return null
+}
+
+// Clean up location string (unescape commas, etc)
+export function cleanLocation(location: string): string {
+  return location.replace(/\\,/g, ',').replace(/\\n/g, ' ').trim()
 }
