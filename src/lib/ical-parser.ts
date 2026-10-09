@@ -90,7 +90,7 @@ export function webcalToHttps(url: string): string {
 }
 
 // Extract teams from fixture data based on source patterns
-export function extractTeams(summary: string, description: string): { homeTeam: string; awayTeam: string; competition?: string } {
+export function extractTeams(summary: string, description: string, location?: string): { homeTeam: string; awayTeam: string; competition?: string } {
   // Pattern 1: Vieira/RQ+ style - "Southwest Baptist at Maryville (MO) (12:00PM CDT)"
   // The description contains "Team A at Team B (time)"
   const atMatch = description.match(/^(.+?)\s+at\s+(.+?)\s*\(/)
@@ -111,12 +111,12 @@ export function extractTeams(summary: string, description: string): { homeTeam: 
   }
 
   // Pattern 3: Eventlink style - "Soccer (Boys V) - John Burroughs High School"
-  // Only one team known, opponent in description or unknown
+  // Venue/location is the home team, summary after dash is away team
   const eventlinkMatch = summary.match(/-\s+(.+)$/)
   if (eventlinkMatch) {
     return {
-      homeTeam: eventlinkMatch[1].trim(),
-      awayTeam: 'TBD',
+      homeTeam: location || 'Home Team',
+      awayTeam: eventlinkMatch[1].trim(),
     }
   }
 

@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         })
 
       // Extract teams, role, competition from the fixture data
-      const { homeTeam, awayTeam } = extractTeams(fixture.summary || '', fixture.description || '')
+      const { homeTeam, awayTeam } = extractTeams(fixture.summary || '', fixture.description || '', fixture.location || '')
       const role = extractRole(fixture.summary || '', fixture.description || '')
       const competition = extractCompetition(fixture.summary || '')
       const location = cleanLocation(fixture.location || '')
