@@ -11,10 +11,28 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
     const from = searchParams.get('from')
     const to = searchParams.get('to')
     const status = searchParams.get('status')
     const source = searchParams.get('source')
+
+    // If id is provided, fetch single fixture directly
+    if (id) {
+      const { data, error } = await supabase
+        .from('fixtures')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .is('archived_at', null)
+        .single() as { data: any; error: Error | null }
+
+      if (error) {
+        return NextResponse.json({ error: 'Fixture not found' }, { status: 404 })
+      }
+
+      return NextResponse.json({ fixture: data })
+    }
 
     let query = supabase
       .from('fixtures')

@@ -59,7 +59,7 @@ export default function FixtureDetailPage() {
         const res = await fetch(`/api/fixtures?id=${params.id}`)
         if (res.ok) {
           const data = await res.json()
-          setFixture(data.fixtures?.[0] || null)
+          setFixture(data.fixture || null)
         }
       } catch (err) {
         console.error('Failed to fetch fixture:', err)
