@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { format, addMinutes, parseISO } from "date-fns"
-import { Clock, MapPin, DollarSign, AlertTriangle, CheckCircle2, XCircle, HelpCircle, Loader2, Navigation } from "lucide-react"
+import { Clock, MapPin, DollarSign, AlertTriangle, CheckCircle2, XCircle, HelpCircle, Loader2, Navigation, Route } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,10 +14,12 @@ import { BottomNav } from "@/components/bottom-nav"
 interface CheckResult {
   status: 'available' | 'tight' | 'unavailable' | 'unknown'
   reason: string
-  beforeFixture?: { time: string; venue: string; travelTime: number }
-  afterFixture?: { time: string; venue: string; travelTime: number }
+  beforeFixture?: { time: string; venue: string; travelTime: number; distanceMiles: number | null }
+  afterFixture?: { time: string; venue: string; travelTime: number; distanceMiles: number | null }
   totalCommitment: string
   expectedHourly: number
+  travelToVenue: number
+  mileage: number | null
   proposed: {
     arrivalTime: string
     kickoff: string
@@ -66,6 +68,8 @@ export default function CheckPage() {
           reason: 'Failed to check availability. Please try again.',
           totalCommitment: '',
           expectedHourly: 0,
+          travelToVenue: 30,
+          mileage: null,
           proposed: { arrivalTime: '', kickoff: '', departureTime: '' },
           existingFixtures: 0,
         })
@@ -77,6 +81,8 @@ export default function CheckPage() {
         reason: 'Network error. Please try again.',
         totalCommitment: '',
         expectedHourly: 0,
+        travelToVenue: 30,
+        mileage: null,
         proposed: { arrivalTime: '', kickoff: '', departureTime: '' },
         existingFixtures: 0,
       })
@@ -105,11 +111,11 @@ export default function CheckPage() {
           expected_gross_amount: fee ? parseFloat(fee) : null,
           source_name: 'Manual',
           import_method: 'manual_check_offer',
+          travel_time_before_minutes: result.travelToVenue,
         }),
       })
 
       if (res.ok) {
-        // Reset form
         setResult(null)
         setVenue('')
         setFee('')
@@ -141,6 +147,7 @@ export default function CheckPage() {
           expected_gross_amount: fee ? parseFloat(fee) : null,
           source_name: 'Manual',
           import_method: 'manual_check_offer',
+          travel_time_before_minutes: result.travelToVenue,
         }),
       })
 
@@ -323,6 +330,26 @@ export default function CheckPage() {
                 </div>
               </div>
 
+              {/* Travel Info */}
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1">
+                    <Route className="w-4 h-4" />
+                    Travel to venue
+                  </span>
+                  <span className="font-medium">{result.travelToVenue} min</span>
+                </div>
+                {result.mileage && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      Distance
+                    </span>
+                    <span className="font-medium">{result.mileage.toFixed(1)} miles</span>
+                  </div>
+                )}
+              </div>
+
               {/* Conflict Details */}
               {result.beforeFixture && (
                 <div className="mt-3 text-sm">
@@ -330,7 +357,8 @@ export default function CheckPage() {
                   <p className="opacity-90">
                     {result.beforeFixture.time} at {result.beforeFixture.venue}
                     <span className="block text-xs opacity-75">
-                      Est. travel: {result.beforeFixture.travelTime} min
+                      Travel: {result.beforeFixture.travelTime} min
+                      {result.beforeFixture.distanceMiles && ` (${result.beforeFixture.distanceMiles.toFixed(1)} mi)`}
                     </span>
                   </p>
                 </div>
@@ -342,7 +370,8 @@ export default function CheckPage() {
                   <p className="opacity-90">
                     {result.afterFixture.time} at {result.afterFixture.venue}
                     <span className="block text-xs opacity-75">
-                      Est. travel: {result.afterFixture.travelTime} min
+                      Travel: {result.afterFixture.travelTime} min
+                      {result.afterFixture.distanceMiles && ` (${result.afterFixture.distanceMiles.toFixed(1)} mi)`}
                     </span>
                   </p>
                 </div>
@@ -405,8 +434,8 @@ export default function CheckPage() {
           <p className="font-medium">Tips:</p>
           <ul className="list-disc list-inside space-y-0.5">
             <li>Enter the full venue address for accurate travel time</li>
-            <li>The system checks your existing fixtures for conflicts</li>
-            <li>Travel time is estimated from your previous location</li>
+            <li>Set your home address in Profile & Travel settings</li>
+            <li>Travel time is calculated using real driving distances</li>
           </ul>
         </div>
       </main>
