@@ -66,3 +66,52 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { id, ...updates } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Fixture ID required' }, { status: 400 })
+    }
+
+    // Verify the fixture belongs to this user
+    const { data: existing } = await supabase
+      .from('fixtures')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single() as { data: any; error: any }
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Fixture not found' }, { status: 404 })
+    }
+
+    const { data, error } = await supabase
+      .from('fixtures')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single() as { data: any; error: Error | null }
+
+    if (error) throw error
+
+    return NextResponse.json({ fixture: data })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}

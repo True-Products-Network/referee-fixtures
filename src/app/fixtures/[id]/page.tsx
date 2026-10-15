@@ -18,10 +18,20 @@ import {
   Mail,
   AlertTriangle,
   Loader2,
+  Edit3,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import type { Fixture } from "@/types"
 
 function getStatusBadgeVariant(status: string) {
@@ -52,6 +62,11 @@ export default function FixtureDetailPage() {
   const router = useRouter()
   const [fixture, setFixture] = useState<Fixture | null>(null)
   const [loading, setLoading] = useState(true)
+  const [completing, setCompleting] = useState(false)
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
+  const [paidAmount, setPaidAmount] = useState<string>("")
+  const [paymentDate, setPaymentDate] = useState<string>(format(new Date(), "yyyy-MM-dd"))
+  const [paymentMethod, setPaymentMethod] = useState<string>("")
 
   useEffect(() => {
     async function fetchFixture() {
@@ -60,6 +75,9 @@ export default function FixtureDetailPage() {
         if (res.ok) {
           const data = await res.json()
           setFixture(data.fixture || null)
+          if (data.fixture?.expected_gross_amount) {
+            setPaidAmount(data.fixture.expected_gross_amount.toString())
+          }
         }
       } catch (err) {
         console.error('Failed to fetch fixture:', err)
@@ -69,6 +87,67 @@ export default function FixtureDetailPage() {
     }
     fetchFixture()
   }, [params.id])
+
+  const handleComplete = async () => {
+    if (!fixture) return
+    setCompleting(true)
+    try {
+      const updates: any = {
+        appointment_status: 'completed',
+        payment_status: 'expected',
+      }
+
+      if (paidAmount) {
+        updates.paid_amount = parseFloat(paidAmount)
+      }
+      if (paymentDate) {
+        updates.payment_date = paymentDate
+      }
+      if (paymentMethod) {
+        updates.payment_method = paymentMethod
+      }
+
+      const res = await fetch('/api/fixtures', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: fixture.id, ...updates }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setFixture(data.fixture)
+        setCompleteDialogOpen(false)
+      }
+    } catch (err) {
+      console.error('Failed to complete fixture:', err)
+    } finally {
+      setCompleting(false)
+    }
+  }
+
+  const handleMarkPaid = async () => {
+    if (!fixture) return
+    try {
+      const res = await fetch('/api/fixtures', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: fixture.id,
+          payment_status: 'paid',
+          paid_amount: paidAmount ? parseFloat(paidAmount) : fixture.expected_gross_amount,
+          payment_date: paymentDate || new Date().toISOString().split('T')[0],
+          payment_method: paymentMethod || null,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setFixture(data.fixture)
+      }
+    } catch (err) {
+      console.error('Failed to mark as paid:', err)
+    }
+  }
 
   if (loading) {
     return (
@@ -95,6 +174,7 @@ export default function FixtureDetailPage() {
   const isCompleted = fixture.appointment_status === 'completed'
   const isCancelled = fixture.appointment_status === 'cancelled' || fixture.appointment_status === 'declined'
   const canComplete = !isCompleted && !isCancelled && isPast(new Date(fixture.kickoff_start))
+  const isPaid = fixture.payment_status === 'paid'
 
   return (
     <div className="min-h-screen pb-8 bg-background">
@@ -231,9 +311,14 @@ export default function FixtureDetailPage() {
                       {fixture.travel_fee && ` + Travel: $${fixture.travel_fee.toFixed(2)}`}
                     </p>
                   )}
-                  <Badge variant={fixture.payment_status === 'paid' ? 'default' : 'secondary'} className="mt-1 text-[10px]">
-                    {fixture.payment_status}
-                  </Badge>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={isPaid ? 'default' : 'secondary'} className="text-[10px]">
+                      {fixture.payment_status}
+                    </Badge>
+                    {fixture.paid_amount && (
+                      <span className="text-xs text-green-600">${fixture.paid_amount.toFixed(2)} paid</span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -250,8 +335,8 @@ export default function FixtureDetailPage() {
 
         {/* Actions */}
         <div className="flex gap-2">
-          <Button 
-            className="flex-1" 
+          <Button
+            className="flex-1"
             size="lg"
             onClick={() => {
               const destination = fixture.venue_name || `${fixture.home_team} vs ${fixture.away_team}`
@@ -261,10 +346,70 @@ export default function FixtureDetailPage() {
             <Navigation className="w-4 h-4 mr-2" />
             Directions
           </Button>
+
           {canComplete && (
-            <Button variant="outline" className="flex-1" size="lg">
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Complete
+            <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex-1" size="lg">
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Complete
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Complete Fixture</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="paidAmount">Amount Paid ($)</Label>
+                    <Input
+                      id="paidAmount"
+                      type="number"
+                      step="0.01"
+                      value={paidAmount}
+                      onChange={(e) => setPaidAmount(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentDate">Payment Date</Label>
+                    <Input
+                      id="paymentDate"
+                      type="date"
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                    <Input
+                      id="paymentMethod"
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      placeholder="Direct deposit, check, cash..."
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={handleComplete}
+                    disabled={completing}
+                  >
+                    {completing ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                    )}
+                    Mark as Completed
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {isCompleted && !isPaid && (
+            <Button variant="outline" className="flex-1" size="lg" onClick={handleMarkPaid}>
+              <DollarSign className="w-4 h-4 mr-2" />
+              Mark Paid
             </Button>
           )}
         </div>
