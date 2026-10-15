@@ -67,6 +67,63 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's tenant_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single() as { data: any; error: any }
+
+    const tenantId = userData?.tenant_id || '00000000-0000-0000-0000-000000000001'
+
+    const body = await request.json()
+
+    const { data, error } = await supabase
+      .from('fixtures')
+      .insert({
+        tenant_id: tenantId,
+        user_id: user.id,
+        source_name: body.source_name || 'Manual',
+        home_team: body.home_team || 'TBD',
+        away_team: body.away_team || 'TBD',
+        sport: body.sport || 'soccer',
+        kickoff_start: body.kickoff_start,
+        expected_match_end: body.expected_match_end || null,
+        required_arrival_time: body.required_arrival_time || null,
+        planned_departure_time: body.planned_departure_time || null,
+        appointment_status: body.appointment_status || 'offered',
+        payment_status: body.payment_status || 'expected',
+        role: body.role || 'referee',
+        venue_name: body.venue_name || null,
+        expected_gross_amount: body.expected_gross_amount || null,
+        import_method: body.import_method || 'manual',
+        timezone: body.timezone || 'America/Chicago',
+        pre_match_buffer_minutes: body.pre_match_buffer_minutes || 45,
+        post_match_buffer_minutes: body.post_match_buffer_minutes || 15,
+      })
+      .select()
+      .single() as { data: any; error: Error | null }
+
+    if (error) throw error
+
+    return NextResponse.json({ fixture: data }, { status: 201 })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()

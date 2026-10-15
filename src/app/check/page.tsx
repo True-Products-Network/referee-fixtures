@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { format, addMinutes } from "date-fns"
-import { Clock, MapPin, DollarSign, AlertTriangle, CheckCircle2, XCircle, HelpCircle } from "lucide-react"
+import { format, addMinutes, parseISO } from "date-fns"
+import { Clock, MapPin, DollarSign, AlertTriangle, CheckCircle2, XCircle, HelpCircle, Loader2, Navigation } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,12 @@ interface CheckResult {
   afterFixture?: { time: string; venue: string; travelTime: number }
   totalCommitment: string
   expectedHourly: number
+  proposed: {
+    arrivalTime: string
+    kickoff: string
+    departureTime: string
+  }
+  existingFixtures: number
 }
 
 export default function CheckPage() {
@@ -30,23 +36,124 @@ export default function CheckPage() {
   const [fee, setFee] = useState("")
   const [result, setResult] = useState<CheckResult | null>(null)
   const [isChecking, setIsChecking] = useState(false)
+  const [recording, setRecording] = useState(false)
 
   const handleCheck = async () => {
     setIsChecking(true)
-    
-    // Simulate conflict check
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Mock result
-    const mockResult: CheckResult = {
-      status: 'available',
-      reason: 'No conflicts found. You have a 3-hour gap before your next fixture.',
-      totalCommitment: '3 hours 15 minutes',
-      expectedHourly: fee ? parseFloat(fee) / 3.25 : 0,
+    setResult(null)
+
+    try {
+      const res = await fetch('/api/check-offer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date,
+          kickoff,
+          duration: parseInt(duration) || 90,
+          arrivalLead: parseInt(arrivalLead) || 45,
+          venue,
+          role,
+          fee: fee ? parseFloat(fee) : null,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setResult(data)
+      } else {
+        setResult({
+          status: 'unknown',
+          reason: 'Failed to check availability. Please try again.',
+          totalCommitment: '',
+          expectedHourly: 0,
+          proposed: { arrivalTime: '', kickoff: '', departureTime: '' },
+          existingFixtures: 0,
+        })
+      }
+    } catch (err) {
+      console.error('Check failed:', err)
+      setResult({
+        status: 'unknown',
+        reason: 'Network error. Please try again.',
+        totalCommitment: '',
+        expectedHourly: 0,
+        proposed: { arrivalTime: '', kickoff: '', departureTime: '' },
+        existingFixtures: 0,
+      })
+    } finally {
+      setIsChecking(false)
     }
-    
-    setResult(mockResult)
-    setIsChecking(false)
+  }
+
+  const handleRecordOffered = async () => {
+    if (!result) return
+    setRecording(true)
+    try {
+      const res = await fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          home_team: 'TBD',
+          away_team: 'TBD',
+          kickoff_start: result.proposed.kickoff,
+          expected_match_end: result.proposed.departureTime,
+          required_arrival_time: result.proposed.arrivalTime,
+          appointment_status: 'offered',
+          payment_status: 'expected',
+          role,
+          venue_name: venue || null,
+          expected_gross_amount: fee ? parseFloat(fee) : null,
+          source_name: 'Manual',
+          import_method: 'manual_check_offer',
+        }),
+      })
+
+      if (res.ok) {
+        // Reset form
+        setResult(null)
+        setVenue('')
+        setFee('')
+      }
+    } catch (err) {
+      console.error('Failed to record:', err)
+    } finally {
+      setRecording(false)
+    }
+  }
+
+  const handleMarkAccepted = async () => {
+    if (!result) return
+    setRecording(true)
+    try {
+      const res = await fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          home_team: 'TBD',
+          away_team: 'TBD',
+          kickoff_start: result.proposed.kickoff,
+          expected_match_end: result.proposed.departureTime,
+          required_arrival_time: result.proposed.arrivalTime,
+          appointment_status: 'accepted',
+          payment_status: 'expected',
+          role,
+          venue_name: venue || null,
+          expected_gross_amount: fee ? parseFloat(fee) : null,
+          source_name: 'Manual',
+          import_method: 'manual_check_offer',
+        }),
+      })
+
+      if (res.ok) {
+        setResult(null)
+        setVenue('')
+        setFee('')
+      }
+    } catch (err) {
+      console.error('Failed to record:', err)
+    } finally {
+      setRecording(false)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -67,6 +174,11 @@ export default function CheckPage() {
       case 'unknown': return <HelpCircle className="w-6 h-6 text-gray-600" />
       default: return null
     }
+  }
+
+  const formatTime = (iso: string) => {
+    if (!iso) return '--'
+    return format(parseISO(iso), 'h:mm a')
   }
 
   return (
@@ -165,12 +277,19 @@ export default function CheckPage() {
               </div>
             </div>
 
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={handleCheck}
               disabled={isChecking}
             >
-              {isChecking ? 'Checking...' : 'Check Availability'}
+              {isChecking ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                'Check Availability'
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -186,6 +305,48 @@ export default function CheckPage() {
                   <p className="text-sm opacity-90">{result.reason}</p>
                 </div>
               </div>
+
+              {/* Proposed Timeline */}
+              <div className="bg-white/50 rounded-lg p-3 space-y-2 mt-3">
+                <p className="text-xs font-medium uppercase tracking-wide opacity-70">Proposed Timeline</p>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4" />
+                  <span>Arrive by {formatTime(result.proposed.arrivalTime)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Navigation className="w-4 h-4" />
+                  <span>Kickoff at {formatTime(result.proposed.kickoff)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Done by {formatTime(result.proposed.departureTime)}</span>
+                </div>
+              </div>
+
+              {/* Conflict Details */}
+              {result.beforeFixture && (
+                <div className="mt-3 text-sm">
+                  <p className="font-medium">Fixture Before:</p>
+                  <p className="opacity-90">
+                    {result.beforeFixture.time} at {result.beforeFixture.venue}
+                    <span className="block text-xs opacity-75">
+                      Est. travel: {result.beforeFixture.travelTime} min
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {result.afterFixture && (
+                <div className="mt-3 text-sm">
+                  <p className="font-medium">Fixture After:</p>
+                  <p className="opacity-90">
+                    {result.afterFixture.time} at {result.afterFixture.venue}
+                    <span className="block text-xs opacity-75">
+                      Est. travel: {result.afterFixture.travelTime} min
+                    </span>
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2 mt-4">
                 <div className="flex items-center justify-between text-sm">
@@ -204,16 +365,37 @@ export default function CheckPage() {
                     <span className="font-medium">${result.expectedHourly.toFixed(2)}/hr</span>
                   </div>
                 )}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    Existing fixtures nearby
+                  </span>
+                  <span className="font-medium">{result.existingFixtures}</span>
+                </div>
               </div>
 
-              <div className="flex gap-2 mt-4">
-                <Button variant="secondary" className="flex-1" size="sm">
-                  Record as Offered
-                </Button>
-                <Button className="flex-1" size="sm">
-                  Mark Accepted
-                </Button>
-              </div>
+              {/* Actions */}
+              {result.status !== 'unavailable' && (
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    size="sm"
+                    onClick={handleRecordOffered}
+                    disabled={recording}
+                  >
+                    {recording ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Record as Offered'}
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    size="sm"
+                    onClick={handleMarkAccepted}
+                    disabled={recording}
+                  >
+                    {recording ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mark Accepted'}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -223,8 +405,8 @@ export default function CheckPage() {
           <p className="font-medium">Tips:</p>
           <ul className="list-disc list-inside space-y-0.5">
             <li>Enter the full venue address for accurate travel time</li>
-            <li>The system checks your personal Google Calendar for conflicts</li>
-            <li>Travel time is calculated from your previous location</li>
+            <li>The system checks your existing fixtures for conflicts</li>
+            <li>Travel time is estimated from your previous location</li>
           </ul>
         </div>
       </main>
