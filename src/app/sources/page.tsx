@@ -277,8 +277,8 @@ export default function SourcesPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <header className="flex-none bg-background border-b px-4 py-3">
+    <div className="app-layout bg-background">
+      <header className="bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
@@ -291,7 +291,7 @@ export default function SourcesPage() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto max-w-lg mx-auto w-full px-4 py-4 space-y-6">
+      <main className="max-w-lg mx-auto w-full px-4 py-4 space-y-6">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
             <p className="font-medium">Error loading data</p>

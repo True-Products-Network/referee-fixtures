@@ -82,42 +82,26 @@
   scrollbar-width: none;
 }
 
-/* Prevent content from scrolling behind fixed nav */
-html {
+/* Mobile app layout - pages with bottom nav should use .app-layout */
+.app-layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  height: 100%;
 }
 
-body {
-  overflow: hidden;
-  height: 100%;
-  position: fixed;
-  width: 100%;
+.app-layout > header {
+  flex-shrink: 0;
 }
 
-/* Main scrollable area */
-.scrollable-content {
-  height: calc(100vh - 3.5rem - 3.5rem); /* viewport - header - bottom nav */
+.app-layout > main {
+  flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Safe area for fixed header */
-.fixed-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 40;
-  height: 3.5rem;
-}
-
-/* Safe area for fixed bottom nav */
-.fixed-bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  height: 3.5rem;
+/* Pages without bottom nav can scroll normally */
+body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }

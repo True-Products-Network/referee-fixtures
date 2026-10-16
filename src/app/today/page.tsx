@@ -166,9 +166,9 @@ export default function TodayPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="app-layout bg-background">
       {/* Header */}
-      <header className="flex-none bg-background border-b px-4 py-3">
+      <header className="bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <h1 className="text-lg font-bold">Today</h1>
           <div className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export default function TodayPage() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto max-w-lg mx-auto w-full px-4 py-4 space-y-4">
+      <main className="max-w-lg mx-auto w-full px-4 py-4 space-y-4">
         {/* Date Range Selector */}
         <div className="relative">
           <Button 

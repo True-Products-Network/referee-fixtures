@@ -60,14 +60,14 @@ export default function MorePage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <header className="flex-none bg-background border-b px-4 py-3">
+    <div className="app-layout bg-background">
+      <header className="bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <h1 className="text-lg font-bold">More</h1>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto max-w-lg mx-auto w-full px-4 py-4 space-y-6">
+      <main className="max-w-lg mx-auto w-full px-4 py-4 space-y-6">
         {/* User Profile Summary */}
         <Card>
           <CardContent className="p-4">
