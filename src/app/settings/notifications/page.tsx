@@ -171,35 +171,35 @@ export default function NotificationsPage() {
             <CardContent className="space-y-3">
               {/* Push Toggle */}
               <div 
-                className="flex items-center justify-between cursor-pointer"
+                className="flex items-center justify-between cursor-pointer select-none"
                 onClick={() => togglePush(setting.id)}
               >
                 <Label className="text-sm cursor-pointer">Push notifications</Label>
-                <div className={`
-                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                  ${setting.push_enabled ? 'bg-primary' : 'bg-input'}
-                `}>
-                  <span className={`
-                    inline-block h-4 w-4 transform rounded-full bg-background transition-transform
-                    ${setting.push_enabled ? 'translate-x-6' : 'translate-x-1'}
-                  `} />
+                <div 
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200"
+                  style={{ backgroundColor: setting.push_enabled ? 'hsl(var(--primary))' : 'hsl(var(--input))' }}
+                >
+                  <span 
+                    className="inline-block h-4 w-4 rounded-full bg-white shadow-md transition-transform duration-200"
+                    style={{ transform: setting.push_enabled ? 'translateX(22px)' : 'translateX(2px)' }}
+                  />
                 </div>
               </div>
 
               {/* Email Toggle */}
               <div 
-                className="flex items-center justify-between cursor-pointer"
+                className="flex items-center justify-between cursor-pointer select-none"
                 onClick={() => toggleEmail(setting.id)}
               >
                 <Label className="text-sm cursor-pointer">Email notifications</Label>
-                <div className={`
-                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                  ${setting.email_enabled ? 'bg-primary' : 'bg-input'}
-                `}>
-                  <span className={`
-                    inline-block h-4 w-4 transform rounded-full bg-background transition-transform
-                    ${setting.email_enabled ? 'translate-x-6' : 'translate-x-1'}
-                  `} />
+                <div 
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200"
+                  style={{ backgroundColor: setting.email_enabled ? 'hsl(var(--primary))' : 'hsl(var(--input))' }}
+                >
+                  <span 
+                    className="inline-block h-4 w-4 rounded-full bg-white shadow-md transition-transform duration-200"
+                    style={{ transform: setting.email_enabled ? 'translateX(22px)' : 'translateX(2px)' }}
+                  />
                 </div>
               </div>
             </CardContent>
