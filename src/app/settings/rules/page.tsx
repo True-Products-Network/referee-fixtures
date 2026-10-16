@@ -26,6 +26,8 @@ const COMPETITION_OPTIONS = [
   "Junior Varsity",
   "Freshman",
   "Club",
+  "College",
+  "Pro",
   "Adult League",
   "Recreational",
   "Tournament",
