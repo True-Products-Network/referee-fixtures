@@ -163,6 +163,10 @@ export async function POST(request: NextRequest) {
       const finalHomeTeam = homeTeam?.trim() || 'TBD'
       const finalAwayTeam = awayTeam?.trim() || 'TBD'
 
+      // Calculate departure time (45 min before kickoff as default travel buffer)
+      const kickoffDate = new Date(fixture.start.toISOString())
+      const departureTime = new Date(kickoffDate.getTime() - 45 * 60 * 1000)
+
       const fixtureData = {
         tenant_id: source.tenant_id,
         user_id: user.id,
@@ -182,6 +186,7 @@ export async function POST(request: NextRequest) {
         timezone: 'America/Chicago',
         kickoff_start: fixture.start.toISOString(),
         expected_match_end: fixture.end.toISOString(),
+        planned_departure_time: departureTime.toISOString(),
         venue_name: location || null,
         payment_status: 'expected',
         pre_match_buffer_minutes: 0,

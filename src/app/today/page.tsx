@@ -184,13 +184,13 @@ export default function TodayPage() {
           </Button>
           
           {showRangePicker && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 py-1">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border rounded-md shadow-lg z-50 py-1">
               {rangeOptions.map((opt) => (
                 <button
                   key={opt.days}
                   onClick={() => selectRange(opt.days, opt.label)}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors ${
-                    rangeDays === opt.days ? 'bg-accent font-medium' : ''
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                    rangeDays === opt.days ? 'bg-gray-100 dark:bg-gray-800 font-medium' : ''
                   }`}
                 >
                   {opt.label}
