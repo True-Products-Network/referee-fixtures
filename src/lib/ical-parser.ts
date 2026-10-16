@@ -211,25 +211,27 @@ export function extractTeams(summary: string, description: string, location?: st
 }
 
 // Extract role from fixture data
+// NOTE: Must return valid values from fixture_roles table:
+// referee, ar1, ar2, fourth_official, mentor, assessor, var, other
 export function extractRole(summary: string, description: string): string {
   // Check summary for role abbreviations
   const upperSummary = summary.toUpperCase()
 
   // Assignr: "U13 AD" = Assistant Referee, "U14 CR" = Center Referee
-  if (/\bAD\b/.test(upperSummary)) return 'assistant_referee'
-  if (/\bAR\b/.test(upperSummary)) return 'assistant_referee'
-  if (/\bCR\b/.test(upperSummary)) return 'center_referee'
-  if (/\b4TH\b/.test(upperSummary)) return 'fourth_official'
+  if (/\bAD\b/.test(upperSummary)) return 'ar1'
+  if (/\bAR\b/.test(upperSummary)) return 'ar1'
+  if (/\bCR\b/.test(upperSummary)) return 'referee'
   if (/\b4TH\b/.test(upperSummary)) return 'fourth_official'
 
   // Check description for role mentions
   const upperDesc = description.toUpperCase()
-  if (upperDesc.includes('CENTER REFEREE') || upperDesc.includes('CR ')) return 'center_referee'
-  if (upperDesc.includes('ASSISTANT REFEREE') || upperDesc.includes('AR ')) return 'assistant_referee'
+  if (upperDesc.includes('CENTER REFEREE') || upperDesc.includes('CR ')) return 'referee'
+  if (upperDesc.includes('ASSISTANT REFEREE') || upperDesc.includes('AR1')) return 'ar1'
+  if (upperDesc.includes('AR2')) return 'ar2'
   if (upperDesc.includes('FOURTH OFFICIAL')) return 'fourth_official'
 
   // Arbiter often puts role in description like "Referee" or "Assistant Referee"
-  if (upperDesc.includes('ASSISTANT REFEREE')) return 'assistant_referee'
+  if (upperDesc.includes('ASSISTANT REFEREE')) return 'ar1'
   if (upperDesc.includes('REFEREE')) return 'referee'
 
   // Default

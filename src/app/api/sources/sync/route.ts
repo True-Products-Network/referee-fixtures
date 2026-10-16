@@ -73,10 +73,12 @@ export async function POST(request: NextRequest) {
     }
 
     const fixtures = parseICS(icsData)
+    const errors: string[] = []
+    let successCount = 0
 
     // Store raw source records
     for (const fixture of fixtures) {
-      await supabase
+      const { error: sourceRecordError } = await supabase
         .from('source_records')
         .upsert({
           tenant_id: source.tenant_id,
@@ -97,40 +99,54 @@ export async function POST(request: NextRequest) {
           onConflict: 'source_connection_id,source_record_id'
         })
 
+      if (sourceRecordError) {
+        console.error('Source record upsert error:', sourceRecordError)
+        errors.push(`Source record ${fixture.uid}: ${sourceRecordError.message}`)
+      }
+
       // Extract teams, role, competition from the fixture data
       const { homeTeam, awayTeam } = extractTeams(fixture.summary || '', fixture.description || '', fixture.location || '')
       const role = extractRole(fixture.summary || '', fixture.description || '')
       const competition = extractCompetition(fixture.summary || '')
       const location = cleanLocation(fixture.location || '')
 
+      // Ensure we have valid team names (required fields)
+      const finalHomeTeam = homeTeam?.trim() || 'TBD'
+      const finalAwayTeam = awayTeam?.trim() || 'TBD'
+
+      const fixtureData = {
+        tenant_id: source.tenant_id,
+        user_id: user.id,
+        source_name: source.name,
+        source_record_id: fixture.uid,
+        source_uid: fixture.uid,
+        import_method: 'ical_feed',
+        sport: 'soccer',
+        competition,
+        home_team: finalHomeTeam,
+        away_team: finalAwayTeam,
+        appointment_status: 'confirmed' as const,
+        role,
+        timezone: 'America/Chicago',
+        kickoff_start: fixture.start.toISOString(),
+        expected_match_end: fixture.end.toISOString(),
+        venue_name: location || null,
+        payment_status: 'expected',
+        pre_match_buffer_minutes: 0,
+        post_match_buffer_minutes: 15,
+      }
+
       const { error: fixtureError } = await supabase
         .from('fixtures')
-        .upsert({
-          tenant_id: source.tenant_id,
-          user_id: user.id,
-          source_name: source.name,
-          source_record_id: fixture.uid,
-          source_uid: fixture.uid,
-          import_method: 'ical_feed',
-          sport: 'soccer',
-          competition,
-          home_team: homeTeam,
-          away_team: awayTeam,
-          appointment_status: 'confirmed',
-          role,
-          timezone: 'America/Chicago',
-          kickoff_start: fixture.start.toISOString(),
-          expected_match_end: fixture.end.toISOString(),
-          venue_name: location || null,
-          payment_status: 'expected',
-          pre_match_buffer_minutes: 0,
-          post_match_buffer_minutes: 15,
-        }, {
+        .upsert(fixtureData, {
           onConflict: 'source_record_id'
         })
 
       if (fixtureError) {
-        console.error('Fixture upsert error:', fixtureError)
+        console.error('Fixture upsert error:', fixtureError, 'Data:', fixtureData)
+        errors.push(`Fixture ${fixture.uid}: ${fixtureError.message}`)
+      } else {
+        successCount++
       }
     }
 
@@ -138,17 +154,19 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('source_connections')
       .update({
-        status: 'active',
+        status: errors.length > 0 && successCount === 0 ? 'error' : 'active',
         last_successful_check: new Date().toISOString(),
         next_planned_check: new Date(Date.now() + (source.refresh_interval_minutes || 60) * 60 * 1000).toISOString(),
-        imported_record_count: fixtures.length,
-        error_count: 0,
+        imported_record_count: successCount,
+        error_count: errors.length,
         updated_at: new Date().toISOString(),
       })
       .eq('id', sourceId)
 
     return NextResponse.json({
       fixturesFound: fixtures.length,
+      fixturesImported: successCount,
+      errors: errors.length > 0 ? errors : undefined,
       fixtures: fixtures.slice(0, 5).map(f => ({
         uid: f.uid,
         summary: f.summary,
@@ -158,6 +176,7 @@ export async function POST(request: NextRequest) {
       })),
     })
   } catch (error) {
+    console.error('Sync error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
