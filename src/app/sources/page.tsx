@@ -75,6 +75,7 @@ export default function SourcesPage() {
   const [error, setError] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [testSourceId, setTestSourceId] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [seeding, setSeeding] = useState(false)
   const [seedResult, setSeedResult] = useState<string | null>(null)
@@ -146,13 +147,14 @@ export default function SourcesPage() {
 
   async function handleTest(source: SourceWithDefinition) {
     // If already showing results for this source, clear them
-    if (testingId === source.id && testResult) {
-      setTestingId(null)
+    if (testSourceId === source.id && testResult) {
+      setTestSourceId(null)
       setTestResult(null)
       return
     }
     
     setTestingId(source.id)
+    setTestSourceId(source.id)
     setTestResult(null)
     try {
       const url = source.feed_url_encrypted || ''
@@ -465,7 +467,7 @@ export default function SourcesPage() {
                   </Button>
                 </div>
 
-                {testingId === source.id && testResult && (
+                {testSourceId === source.id && testResult && (
                   <div className="mt-3 text-sm space-y-2 border-t pt-3">
                     {testResult.error ? (
                       <p className="text-red-500">{testResult.error}</p>
