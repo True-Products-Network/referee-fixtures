@@ -85,6 +85,36 @@ export async function POST(request: NextRequest) {
     const errors: string[] = []
     let successCount = 0
 
+    // Fetch arrival rules for this user
+    const { data: arrivalRules } = await supabase
+      .from('arrival_rules')
+      .select('*')
+      .eq('tenant_id', source.tenant_id)
+      .order('arrival_lead_minutes', { ascending: false })
+
+    // Default arrival rule
+    const defaultRule = {
+      arrival_lead_minutes: 45,
+      parking_buffer_minutes: 15,
+      match_duration_minutes: 90,
+      post_match_buffer_minutes: 15,
+    }
+
+    // Helper to find matching arrival rule
+    function findArrivalRule(competition?: string | null, role?: string | null) {
+      if (!arrivalRules || arrivalRules.length === 0) return defaultRule
+      
+      // Try to find exact match
+      const match = (arrivalRules as any[]).find((r: any) => {
+        const compMatch = !r.competition_type || !competition || 
+          competition.toLowerCase().includes(r.competition_type.toLowerCase())
+        const roleMatch = !r.role || !role || r.role === role
+        return compMatch && roleMatch
+      })
+      
+      return match || defaultRule
+    }
+
     // Store raw source records
     for (const fixture of fixtures) {
       const { error: sourceRecordError } = await supabase
@@ -163,9 +193,19 @@ export async function POST(request: NextRequest) {
       const finalHomeTeam = homeTeam?.trim() || 'TBD'
       const finalAwayTeam = awayTeam?.trim() || 'TBD'
 
-      // Calculate departure time (45 min before kickoff as default travel buffer)
+      // Find matching arrival rule
+      const arrivalRule = findArrivalRule(competition, role)
+      
+      // Calculate times based on arrival rule
       const kickoffDate = new Date(fixture.start.toISOString())
-      const departureTime = new Date(kickoffDate.getTime() - 45 * 60 * 1000)
+      const arrivalLeadMs = (arrivalRule.arrival_lead_minutes || 45) * 60 * 1000
+      const parkingBufferMs = (arrivalRule.parking_buffer_minutes || 15) * 60 * 1000
+      const postMatchBufferMs = (arrivalRule.post_match_buffer_minutes || 15) * 60 * 1000
+      
+      const requiredArrivalTime = new Date(kickoffDate.getTime() - arrivalLeadMs)
+      const plannedDepartureTime = new Date(kickoffDate.getTime() - arrivalLeadMs - parkingBufferMs)
+      const expectedMatchEnd = new Date(fixture.end.toISOString())
+      const postMatchEnd = new Date(expectedMatchEnd.getTime() + postMatchBufferMs)
 
       const fixtureData = {
         tenant_id: source.tenant_id,
@@ -185,12 +225,13 @@ export async function POST(request: NextRequest) {
         crew_names: crewNames.length > 0 ? crewNames : null,
         timezone: 'America/Chicago',
         kickoff_start: fixture.start.toISOString(),
-        expected_match_end: fixture.end.toISOString(),
-        planned_departure_time: departureTime.toISOString(),
+        expected_match_end: postMatchEnd.toISOString(),
+        required_arrival_time: requiredArrivalTime.toISOString(),
+        planned_departure_time: plannedDepartureTime.toISOString(),
         venue_name: location || null,
         payment_status: 'expected',
-        pre_match_buffer_minutes: 0,
-        post_match_buffer_minutes: 15,
+        pre_match_buffer_minutes: arrivalRule.arrival_lead_minutes || 45,
+        post_match_buffer_minutes: arrivalRule.post_match_buffer_minutes || 15,
       }
 
       const { error: fixtureError } = await supabase

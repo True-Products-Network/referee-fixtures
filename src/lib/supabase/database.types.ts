@@ -414,6 +414,60 @@ export interface Database {
         }
         Relationships: []
       }
+      arrival_rules: {
+        Row: {
+          id: string
+          tenant_id: string
+          scope_type: string
+          scope_id: string | null
+          competition_type: string | null
+          role: string | null
+          age_group: string | null
+          arrival_lead_minutes: number
+          parking_buffer_minutes: number
+          match_duration_minutes: number
+          post_match_buffer_minutes: number
+          effective_from: string
+          effective_to: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          scope_type: string
+          scope_id?: string | null
+          competition_type?: string | null
+          role?: string | null
+          age_group?: string | null
+          arrival_lead_minutes?: number
+          parking_buffer_minutes?: number
+          match_duration_minutes?: number
+          post_match_buffer_minutes?: number
+          effective_from?: string
+          effective_to?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          scope_type?: string
+          scope_id?: string | null
+          competition_type?: string | null
+          role?: string | null
+          age_group?: string | null
+          arrival_lead_minutes?: number
+          parking_buffer_minutes?: number
+          match_duration_minutes?: number
+          post_match_buffer_minutes?: number
+          effective_from?: string
+          effective_to?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
