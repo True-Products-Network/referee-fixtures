@@ -96,6 +96,8 @@ export async function POST(request: NextRequest) {
     let reason = 'No conflicts found. You are clear for this fixture.'
     let beforeFixture: { time: string; venue: string; travelTime: number; distanceMiles: number | null } | undefined
     let afterFixture: { time: string; venue: string; travelTime: number; distanceMiles: number | null } | undefined
+    let smallestGapBefore = Infinity
+    let smallestGapAfter = Infinity
 
     for (const fixture of activeFixtures) {
       const fixtureStart = parseISO(fixture.kickoff_start)
@@ -132,6 +134,13 @@ export async function POST(request: NextRequest) {
       if (overlaps) {
         status = 'unavailable'
         reason = `Conflict: You have ${fixture.home_team} v ${fixture.away_team} at ${format(fixtureStart, 'h:mm a')} (${fixture.appointment_status})`
+        // Set beforeFixture to the conflicting fixture for context
+        beforeFixture = {
+          time: format(fixtureStart, 'h:mm a'),
+          venue: fixture.venue_name || 'Unknown venue',
+          travelTime: travelBetweenFixtures,
+          distanceMiles: distanceBetween,
+        }
         break
       }
 
@@ -140,14 +149,17 @@ export async function POST(request: NextRequest) {
       const requiredGapBefore = travelBetweenFixtures + MIN_GAP_MINUTES
       const gapBefore = differenceInMinutes(proposedWindowStart, fixtureDeparture)
 
-      if (gapBefore >= 0 && gapBefore < requiredGapBefore) {
-        status = 'tight'
-        reason = `Tight: Only ${gapBefore} min gap (need ${requiredGapBefore} min including ${travelBetweenFixtures} min travel) after ${fixture.home_team} v ${fixture.away_team}`
+      if (gapBefore >= 0 && gapBefore < smallestGapBefore) {
+        smallestGapBefore = gapBefore
         beforeFixture = {
           time: format(fixtureStart, 'h:mm a'),
           venue: fixture.venue_name || 'Unknown venue',
           travelTime: travelBetweenFixtures,
           distanceMiles: distanceBetween,
+        }
+        if (gapBefore < requiredGapBefore) {
+          status = 'tight'
+          reason = `Tight: Only ${gapBefore} min gap (need ${requiredGapBefore} min including ${travelBetweenFixtures} min travel) after ${fixture.home_team} v ${fixture.away_team}`
         }
       }
 
@@ -155,18 +167,25 @@ export async function POST(request: NextRequest) {
       const requiredGapAfter = travelBetweenFixtures + MIN_GAP_MINUTES
       const gapAfter = differenceInMinutes(fixtureArrival, proposedWindowEnd)
 
-      if (gapAfter >= 0 && gapAfter < requiredGapAfter) {
-        if (status === 'available') {
-          status = 'tight'
-          reason = `Tight: Only ${gapAfter} min gap (need ${requiredGapAfter} min including ${travelBetweenFixtures} min travel) before ${fixture.home_team} v ${fixture.away_team}`
-        }
+      if (gapAfter >= 0 && gapAfter < smallestGapAfter) {
+        smallestGapAfter = gapAfter
         afterFixture = {
           time: format(fixtureStart, 'h:mm a'),
           venue: fixture.venue_name || 'Unknown venue',
           travelTime: travelBetweenFixtures,
           distanceMiles: distanceBetween,
         }
+        if (gapAfter < requiredGapAfter && status === 'available') {
+          status = 'tight'
+          reason = `Tight: Only ${gapAfter} min gap (need ${requiredGapAfter} min including ${travelBetweenFixtures} min travel) before ${fixture.home_team} v ${fixture.away_team}`
+        }
       }
+    }
+
+    // If no tight gaps found, clear the before/after fixtures
+    if (status === 'available') {
+      beforeFixture = undefined
+      afterFixture = undefined
     }
 
     // Calculate total commitment
