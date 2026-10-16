@@ -29,45 +29,66 @@ function parseDateTime(value: string, tzid?: string): Date {
     const tz = tzid
     
     try {
-      // Format a known UTC date in the target timezone to find the offset
-      const testDate = new Date('2026-10-18T00:00:00Z') // Known UTC time
+      // Strategy: Use the fact that new Date('YYYY-MM-DDTHH:MM:SS') creates a date
+      // in the LOCAL timezone. We need to find what UTC time corresponds to the given
+      // local time in the target timezone.
       
+      // Parse the target local time components
+      const targetYear = parseInt(value.slice(0, 4))
+      const targetMonth = parseInt(value.slice(4, 6)) - 1 // 0-indexed
+      const targetDay = parseInt(value.slice(6, 8))
+      const targetHour = parseInt(value.slice(9, 11))
+      const targetMinute = parseInt(value.slice(11, 13))
+      const targetSecond = parseInt(value.slice(13, 15))
+      
+      // Create a formatter for the target timezone
       const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: tz,
         year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
         hour12: false,
       })
       
-      const parts = formatter.formatToParts(testDate)
-      const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0')
+      // Start with an estimate: create a UTC date with the same components
+      // This will be wrong by the timezone offset, but gives us a starting point
+      let guess = Date.UTC(targetYear, targetMonth, targetDay, targetHour, targetMinute, targetSecond)
       
-      const tzYear = getPart('year')
-      const tzMonth = getPart('month')
-      const tzDay = getPart('day')
-      const tzHour = getPart('hour')
-      const tzMinute = getPart('minute')
-      const tzSecond = getPart('second')
-      
-      // Calculate the time difference between UTC and target timezone
-      const utcMs = testDate.getTime()
-      const tzMs = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMinute, tzSecond)
-      const offsetMs = tzMs - utcMs
-      
-      // Now parse our target time as if it's UTC, then subtract the offset
-      const targetAsUtc = new Date(dtStr + 'Z')
-      const resultMs = targetAsUtc.getTime() - offsetMs
-      
-      if (isNaN(resultMs)) {
-        console.log('NaN result!', { dtStr, offsetMs, targetAsUtc: targetAsUtc.getTime() })
-        return new Date(dtStr)
+      // Iteratively adjust: format the guess in target tz, compare to desired time
+      for (let i = 0; i < 5; i++) {
+        const guessDate = new Date(guess)
+        const parts = formatter.formatToParts(guessDate)
+        const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0')
+        
+        const guessYear = getPart('year')
+        const guessMonth = getPart('month') - 1 // 0-indexed
+        const guessDay = getPart('day')
+        const guessHour = getPart('hour')
+        const guessMinute = getPart('minute')
+        const guessSecond = getPart('second')
+        
+        // Check if we found the right time
+        if (guessYear === targetYear && 
+            guessMonth === targetMonth && 
+            guessDay === targetDay && 
+            guessHour === targetHour && 
+            guessMinute === targetMinute && 
+            guessSecond === targetSecond) {
+          return new Date(guess)
+        }
+        
+        // Calculate the difference and adjust
+        const guessTime = Date.UTC(guessYear, guessMonth, guessDay, guessHour, guessMinute, guessSecond)
+        const targetTime = Date.UTC(targetYear, targetMonth, targetDay, targetHour, targetMinute, targetSecond)
+        const diff = targetTime - guessTime
+        
+        guess += diff
       }
       
-      return new Date(resultMs)
+      return new Date(guess)
     } catch (e) {
       console.error('Timezone parsing error:', e)
       return new Date(dtStr)
