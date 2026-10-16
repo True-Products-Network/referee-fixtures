@@ -187,10 +187,18 @@ export function parseICS(icsData: string): ParsedFixture[] {
 
       if (line.startsWith('UID:')) {
         uid = line.slice(4)
-      } else if (line.startsWith('SUMMARY:')) {
-        summary = line.slice(8)
-      } else if (line.startsWith('DESCRIPTION:')) {
-        description = line.slice(12)
+      } else if (line.startsWith('SUMMARY')) {
+        // Handle SUMMARY;LANGUAGE=en-us:Women's Soccer
+        const colonIdx = line.indexOf(':')
+        if (colonIdx !== -1) {
+          summary = line.slice(colonIdx + 1)
+        }
+      } else if (line.startsWith('DESCRIPTION')) {
+        // Handle DESCRIPTION;LANGUAGE=en-us:...
+        const colonIdx = line.indexOf(':')
+        if (colonIdx !== -1) {
+          description = line.slice(colonIdx + 1)
+        }
       } else if (line.startsWith('DTSTART')) {
         const colonIdx = line.indexOf(':')
         if (colonIdx !== -1) {
@@ -207,8 +215,11 @@ export function parseICS(icsData: string): ParsedFixture[] {
           const tzMatch = params.match(/TZID=([^;]+)/)
           if (tzMatch) endTzid = tzMatch[1]
         }
-      } else if (line.startsWith('LOCATION:')) {
-        location = line.slice(9)
+      } else if (line.startsWith('LOCATION')) {
+        const colonIdx = line.indexOf(':')
+        if (colonIdx !== -1) {
+          location = line.slice(colonIdx + 1)
+        }
       } else if (line.startsWith('STATUS:')) {
         status = line.slice(7)
       }
@@ -339,8 +350,20 @@ export function parseArbiterDescription(description: string): ArbiterDetails {
   const details: ArbiterDetails = { officials: [] }
 
   for (const line of lines) {
-    // Key: Value format
-    const kvMatch = line.match(/^([^:]+):\s*(.+)/)
+    // Official format: "Name Position: Role" (check FIRST before key-value)
+    // "Doug Helfrich Position: Referee"
+    // "Nigel Lear Position: AR 1"
+    const officialMatch = line.match(/^(.+?)\s+Position:\s*(.+)/)
+    if (officialMatch) {
+      details.officials.push({
+        name: officialMatch[1].trim(),
+        position: officialMatch[2].trim(),
+      })
+      continue
+    }
+
+    // Key: Value format (single word keys only)
+    const kvMatch = line.match(/^([A-Za-z\s]+):\s*(.+)/)
     if (kvMatch) {
       const key = kvMatch[1].trim().toLowerCase()
       const value = kvMatch[2].trim()
@@ -356,18 +379,6 @@ export function parseArbiterDescription(description: string): ArbiterDetails {
       continue
     }
 
-    // Official format: "Name Position: Role"
-    // "Doug Helfrich Position: Referee"
-    // "Nigel Lear Position: AR 1"
-    const officialMatch = line.match(/^(.+?)\s+Position:\s*(.+)/)
-    if (officialMatch) {
-      details.officials.push({
-        name: officialMatch[1].trim(),
-        position: officialMatch[2].trim(),
-      })
-      continue
-    }
-
     // URL
     if (line.startsWith('http')) {
       details.url = line
@@ -379,7 +390,7 @@ export function parseArbiterDescription(description: string): ArbiterDetails {
 
 // Determine if this is an Arbiter feed based on description content
 function isArbiterDescription(description: string): boolean {
-  return description.includes('Position:') && description.includes('Event:')
+  return description.includes('Position:') && (description.includes('Sport:') || description.includes('Event:'))
 }
 
 // Determine if this is an Assignr feed based on description content
@@ -389,18 +400,24 @@ function isAssignrDescription(description: string): boolean {
 
 // Extract teams from fixture data based on source patterns
 export function extractTeams(summary: string, description: string, location?: string): { homeTeam: string; awayTeam: string; competition?: string } {
-  // Pattern 0a: Arbiter - use Event/Team from description
+  // Pattern 0a: Arbiter - use Sport/Level/Team from description
   if (isArbiterDescription(description)) {
     const arbiter = parseArbiterDescription(description)
-    if (arbiter.event && arbiter.team) {
+    // Arbiter has: Sport + Level + Team (single team, not both home/away)
+    // Build event name from Level + Sport (e.g., "Women's Soccer")
+    const eventName = arbiter.level && arbiter.sport 
+      ? `${arbiter.level} ${arbiter.sport}`
+      : arbiter.sport || arbiter.level || ''
+    
+    if (arbiter.team) {
       return {
         homeTeam: arbiter.team,
-        awayTeam: arbiter.event,
+        awayTeam: eventName,
       }
     }
-    if (arbiter.event) {
+    if (eventName) {
       return {
-        homeTeam: arbiter.event,
+        homeTeam: eventName,
         awayTeam: '',
       }
     }
