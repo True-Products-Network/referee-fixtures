@@ -52,9 +52,13 @@ export default function ReviewQueuePage() {
       if (storedRes.ok) {
         const data = await storedRes.json()
         stored = data.issues || []
+        console.log('Fetched stored issues:', stored.length, stored.map((s: StoredIssue) => s.issue_key))
+      } else {
+        console.error('Failed to fetch stored issues:', storedRes.status, await storedRes.text())
       }
       setStoredIssues(stored)
       const storedKeys = new Set(stored.map((i: StoredIssue) => i.issue_key))
+      console.log('Stored keys for filtering:', storedKeys.size)
 
       // Fetch fixtures
       const fixturesRes = await fetch('/api/fixtures?from=2026-01-01&to=2027-12-31')
@@ -169,9 +173,14 @@ export default function ReviewQueuePage() {
       })
 
       if (res.ok) {
+        const result = await res.json()
+        console.log('Action result:', result)
         // Remove from local state
         setIssues(prev => prev.filter(i => i.id !== issue.id))
         setSelectedIssue(null)
+      } else {
+        const error = await res.text()
+        console.error('Action failed:', error)
       }
     } catch (err) {
       console.error('Failed to update issue:', err)

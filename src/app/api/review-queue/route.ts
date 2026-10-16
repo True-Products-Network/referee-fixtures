@@ -19,14 +19,16 @@ export async function GET() {
 
     const tenantId = userData?.tenant_id || user.id
 
-    // Get all non-dismissed/non-resolved issues
+    // Get all dismissed/resolved issues to filter out
     const { data: issues, error } = await supabase
       .from('review_queue')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('user_id', user.id)
-      .in('status', ['pending', 'new'])
+      .in('status', ['dismissed', 'resolved'])
       .order('created_at', { ascending: false })
+    
+    console.log('GET /api/review-queue - tenantId:', tenantId, 'userId:', user.id, 'found:', issues?.length || 0, 'issues')
 
     if (error) {
       console.error('Error fetching review queue:', error)
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
+      console.log('POST /api/review-queue - saved:', issueKey, 'status:', action === 'resolve' ? 'resolved' : 'dismissed')
       return NextResponse.json({ success: true })
     }
 
