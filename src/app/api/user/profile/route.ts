@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       home_lat: userData.home_lat,
       home_lng: userData.home_lng,
       mileage_rate: userData.mileage_rate,
+      timezone: userData.timezone,
     })
   } catch (error) {
     return NextResponse.json(
@@ -57,6 +58,7 @@ export async function PATCH(request: NextRequest) {
     if (body.phone !== undefined) updates.phone = body.phone
     if (body.home_address !== undefined) updates.home_address = body.home_address
     if (body.mileage_rate !== undefined) updates.mileage_rate = body.mileage_rate
+    if (body.timezone !== undefined) updates.timezone = body.timezone
 
     const { data, error } = await supabase
       .from('users')
@@ -74,6 +76,7 @@ export async function PATCH(request: NextRequest) {
       phone: userData.phone,
       home_address: userData.home_address,
       mileage_rate: userData.mileage_rate,
+      timezone: userData.timezone,
     })
   } catch (error) {
     return NextResponse.json(

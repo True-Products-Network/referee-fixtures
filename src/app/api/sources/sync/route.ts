@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { parseICS, webcalToHttps, extractTeams, extractRole, extractCompetition, cleanLocation, parseAssignrDescription } from '@/lib/ical-parser'
+import { parseICS, webcalToHttps, extractTeams, extractRole, extractUserRole, extractCompetition, cleanLocation, parseAssignrDescription, parseArbiterDescription } from '@/lib/ical-parser'
 import type { SourceConnection } from '@/lib/supabase/database.types'
 
 export async function POST(request: NextRequest) {
@@ -11,6 +11,15 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Get user's full name from profile for role detection
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const userFullName = userProfile?.full_name || user.user_metadata?.full_name || ''
 
     const { sourceId } = await request.json()
 
@@ -106,19 +115,49 @@ export async function POST(request: NextRequest) {
 
       // Extract teams, role, competition from the fixture data
       const { homeTeam, awayTeam } = extractTeams(fixture.summary || '', fixture.description || '', fixture.location || '')
-      const role = extractRole(fixture.summary || '', fixture.description || '')
+      
+      // Try to extract user's specific role first, fallback to generic extraction
+      let role = extractUserRole(fixture.description || '', userFullName)
+      if (role === 'referee' && userFullName) {
+        // If extractUserRole returned default, try the generic one
+        role = extractRole(fixture.summary || '', fixture.description || '')
+      }
+      
       const competition = extractCompetition(fixture.summary || '')
       const location = cleanLocation(fixture.location || '')
 
-      // Parse Assignr-specific details from description
+      // Parse source-specific details from description
       const assignrDetails = parseAssignrDescription(fixture.description || '')
+      const arbiterDetails = parseArbiterDescription(fixture.description || '')
 
-      // Build crew list from Assignr officials
+      // Build crew list from officials
       const crewNames: string[] = []
+      
+      // Assignr officials
       if (assignrDetails.referee) crewNames.push(assignrDetails.referee)
       if (assignrDetails.ar1 && assignrDetails.ar1 !== 'unassigned') crewNames.push(assignrDetails.ar1)
       if (assignrDetails.ar2 && assignrDetails.ar2 !== 'unassigned') crewNames.push(assignrDetails.ar2)
       if (assignrDetails.fourthOfficial && assignrDetails.fourthOfficial !== 'unassigned') crewNames.push(assignrDetails.fourthOfficial)
+      
+      // Arbiter officials
+      for (const official of arbiterDetails.officials) {
+        const name = `${official.name} (${official.position})`
+        if (!crewNames.includes(name)) {
+          crewNames.push(name)
+        }
+      }
+
+      // Determine source organisation
+      let sourceOrganisation = assignrDetails.organisation
+      if (!sourceOrganisation && arbiterDetails.event) {
+        sourceOrganisation = 'ArbiterSports'
+      }
+
+      // Determine source URL
+      let sourceUrl = assignrDetails.url
+      if (!sourceUrl && arbiterDetails.url) {
+        sourceUrl = arbiterDetails.url
+      }
 
       // Ensure we have valid team names (required fields)
       const finalHomeTeam = homeTeam?.trim() || 'TBD'
@@ -128,10 +167,10 @@ export async function POST(request: NextRequest) {
         tenant_id: source.tenant_id,
         user_id: user.id,
         source_name: source.name,
-        source_organisation: assignrDetails.organisation || null,
+        source_organisation: sourceOrganisation || null,
         source_record_id: fixture.uid,
         source_uid: fixture.uid,
-        source_url: assignrDetails.url || null,
+        source_url: sourceUrl || null,
         import_method: 'ical_feed',
         sport: 'soccer',
         competition,

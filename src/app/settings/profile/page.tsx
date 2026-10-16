@@ -2,12 +2,24 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, Loader2, MapPin, Save } from "lucide-react"
+import { ChevronLeft, Loader2, MapPin, Save, Clock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/hooks/use-auth"
+
+const TIMEZONES = [
+  { value: "America/New_York", label: "Eastern (ET)" },
+  { value: "America/Chicago", label: "Central (CT)" },
+  { value: "America/Denver", label: "Mountain (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific (PT)" },
+  { value: "America/Anchorage", label: "Alaska (AK)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (HI)" },
+  { value: "America/Phoenix", label: "Arizona (AZ)" },
+  { value: "America/Detroit", label: "Detroit" },
+  { value: "America/Indiana/Indianapolis", label: "Indiana (East)" },
+]
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
@@ -19,6 +31,7 @@ export default function ProfileSettingsPage() {
   const [phone, setPhone] = useState("")
   const [homeAddress, setHomeAddress] = useState("")
   const [mileageRate, setMileageRate] = useState("0.67")
+  const [timezone, setTimezone] = useState("America/Chicago")
 
   useEffect(() => {
     if (user) {
@@ -36,6 +49,7 @@ export default function ProfileSettingsPage() {
         setPhone(data.phone || "")
         setHomeAddress(data.home_address || "")
         setMileageRate(data.mileage_rate?.toString() || "0.67")
+        setTimezone(data.timezone || "America/Chicago")
       }
     } catch (err) {
       console.error('Failed to fetch profile:', err)
@@ -54,6 +68,7 @@ export default function ProfileSettingsPage() {
           phone,
           home_address: homeAddress,
           mileage_rate: parseFloat(mileageRate),
+          timezone,
         }),
       })
 
@@ -114,6 +129,35 @@ export default function ProfileSettingsPage() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(555) 123-4567"
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Timezone
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="timezone">Your Timezone</Label>
+              <select
+                id="timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full p-2 border rounded-md text-sm bg-white dark:bg-gray-900"
+              >
+                {TIMEZONES.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Used to display fixture times correctly
+              </p>
             </div>
           </CardContent>
         </Card>

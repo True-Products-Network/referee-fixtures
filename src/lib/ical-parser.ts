@@ -10,6 +10,8 @@ export interface ParsedFixture {
 }
 
 // Parse iCal datetime values properly with timezone awareness
+// iCal format: DTSTART;TZID=America/Chicago:20261017T110000
+// The datetime string is in the specified timezone, NOT UTC
 function parseDateTime(value: string, tzid?: string): Date {
   // Handle VALUE=DATE:20250915
   const dateMatch = value.match(/VALUE=DATE:(\d{8})/)
@@ -21,17 +23,24 @@ function parseDateTime(value: string, tzid?: string): Date {
   }
 
   // Handle TZID=America/Chicago:20260913T090000
-  // The datetime is in the specified timezone, NOT UTC
   const tzMatch = value.match(/TZID=([^:]+):(\d{8}T\d{6})/)
   if (tzMatch) {
     const dtStr = tzMatch[2].slice(0, 4) + '-' + tzMatch[2].slice(4, 6) + '-' + tzMatch[2].slice(6, 8) + 'T' + tzMatch[2].slice(9, 11) + ':' + tzMatch[2].slice(11, 13) + ':' + tzMatch[2].slice(13, 15)
-    // Append the timezone offset so it's parsed correctly
-    // For America/Chicago, we need to know if it's CDT (-05:00) or CST (-06:00)
-    // We'll use the tzid to create a proper ISO string
     const tz = tzMatch[1]
+    
     try {
-      // Use Intl.DateTimeFormat to get the offset for the specific date
-      const testDate = new Date(dtStr)
+      // Create a date string that specifies the timezone properly
+      // Use toLocaleString to convert from tz time to local, then parse
+      // Format: "2026-10-17T11:00:00" in America/Chicago time
+      
+      // Strategy: Use the fact that Date.parse can handle ISO strings with offsets
+      // We need to find the offset for this specific date in this timezone
+      
+      // Create a date object assuming the dtStr is in the target timezone
+      // by using Intl to find the equivalent UTC time
+      const targetDate = new Date(dtStr + 'Z') // Start with UTC interpretation
+      
+      // Format the UTC date in the target timezone to see what time it shows
       const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: tz,
         year: 'numeric',
@@ -41,18 +50,56 @@ function parseDateTime(value: string, tzid?: string): Date {
         minute: '2-digit',
         second: '2-digit',
         hour12: false,
-        timeZoneName: 'shortOffset'
       })
-      const parts = formatter.formatToParts(testDate)
-      const offsetPart = parts.find(p => p.type === 'timeZoneName')
-      if (offsetPart) {
-        const offset = offsetPart.value.replace('GMT', '').replace('UTC', '')
-        // Convert offset like -05:00 or +00:00
-        const isoStr = dtStr + offset
-        return new Date(isoStr)
-      }
-    } catch {
-      // Fallback: parse as local time
+      
+      const parts = formatter.formatToParts(targetDate)
+      const getPart = (type: string) => parts.find(p => p.type === type)?.value || '00'
+      
+      const formattedInTz = `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      
+      // If formatting the UTC date in the target timezone gives us the expected time,
+      // then we got it right. If not, adjust.
+      // Actually, simpler approach: just construct an ISO string with the timezone
+      // and let the browser handle it
+      
+      // Best approach: Use the tz-aware string format that Date can parse
+      // "2026-10-17T11:00:00-05:00" for CDT or "-06:00" for CST
+      
+      // Get offset by comparing UTC timestamp formatted in target tz vs actual UTC
+      const utcDate = new Date(dtStr + 'Z')
+      const utcTime = utcDate.getTime()
+      
+      // Format UTC date in target timezone
+      const tzFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false,
+      })
+      
+      const tzParts = tzFormatter.formatToParts(utcDate)
+      const tzYear = parseInt(tzParts.find(p => p.type === 'year')?.value || '0')
+      const tzMonth = parseInt(tzParts.find(p => p.type === 'month')?.value || '0') - 1
+      const tzDay = parseInt(tzParts.find(p => p.type === 'day')?.value || '0')
+      const tzHour = parseInt(tzParts.find(p => p.type === 'hour')?.value || '0')
+      const tzMinute = parseInt(tzParts.find(p => p.type === 'minute')?.value || '0')
+      const tzSecond = parseInt(tzParts.find(p => p.type === 'second')?.value || '0')
+      
+      const tzTime = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMinute, tzSecond)
+      const offsetMs = tzTime - utcTime
+      const offsetHours = Math.abs(Math.floor(offsetMs / 3600000))
+      const offsetMinutes = Math.abs(Math.floor((offsetMs % 3600000) / 60000))
+      const offsetSign = offsetMs >= 0 ? '+' : '-'
+      const offsetStr = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`
+      
+      const isoStr = dtStr + offsetStr
+      return new Date(isoStr)
+    } catch (e) {
+      console.error('Timezone parsing error:', e)
     }
     return new Date(dtStr)
   }
@@ -152,8 +199,6 @@ export function parseICS(icsData: string): ParsedFixture[] {
       } else if (line.startsWith('DESCRIPTION:')) {
         description = line.slice(12)
       } else if (line.startsWith('DTSTART')) {
-        // Handle DTSTART;TZID=America/Chicago:20260913T090000
-        // or DTSTART:20250915T190000Z
         const colonIdx = line.indexOf(':')
         if (colonIdx !== -1) {
           const params = line.slice(0, colonIdx)
@@ -185,13 +230,9 @@ export function webcalToHttps(url: string): string {
 }
 
 // Parse Assignr description format
+// iCal DESCRIPTION field uses \n for newlines, \, for commas, etc
 // Example:
-// USOfficials
-// SLSG MO B 2012/2013 NAL St. Charles (St. Louis Scott Gallagher St. Charles) vs. STLDA 2012/13B Elite (NAL) (St. Louis Development Academy)
-// R: Lear, Nigel
-// AR: Roca, Kevin
-// AR: unassigned
-// https://usofficials.assignr.com/games/28063426
+// USOfficials\nSLSG MO B 2012/2013 NAL St. Charles (St. Louis Scott Gallagher St. Charles) vs. STLDA 2012/13B Elite (NAL) (St. Louis Development Academy)\nR: Lear, Nigel\nAR: Roca, Kevin\nAR: unassigned\nhttps://usofficials.assignr.com/games/28063426
 export interface AssignrDetails {
   organisation?: string
   homeTeam?: string
@@ -207,6 +248,8 @@ export interface AssignrDetails {
 }
 
 export function parseAssignrDescription(description: string): AssignrDetails {
+  // iCal escapes newlines as \n, so we need to split on actual newlines in the parsed content
+  // The description field in iCal has literal \n characters which represent newlines
   const lines = description.split('\\n').map(l => l.trim()).filter(l => l.length > 0)
   const details: AssignrDetails = {}
 
@@ -268,19 +311,116 @@ export function parseAssignrDescription(description: string): AssignrDetails {
   return details
 }
 
+// Parse ArbiterSports description format
+// Example:
+// Event: Men's Soccer
+// Location Address: 650 Maryville university Dr.
+// Date: Saturday, October 17, 2026 11am - 12:20pm
+// Sport: Soccer
+// Level: Men's
+// Team: Maryville Club
+// Site: Maryville college club fields.
+// Subsite: Maryville college club fields.
+// Doug Helfrich Position: Referee
+// Nigel Lear Position: AR 1
+// Sadeth Phimphavong Position: AR 2
+export interface ArbiterDetails {
+  event?: string
+  locationAddress?: string
+  dateString?: string
+  sport?: string
+  level?: string
+  team?: string
+  site?: string
+  subsite?: string
+  officials: Array<{ name: string; position: string }>
+  url?: string
+}
+
+export function parseArbiterDescription(description: string): ArbiterDetails {
+  const lines = description.split('\\n').map(l => l.trim()).filter(l => l.length > 0)
+  const details: ArbiterDetails = { officials: [] }
+
+  for (const line of lines) {
+    // Key: Value format
+    const kvMatch = line.match(/^([^:]+):\s*(.+)/)
+    if (kvMatch) {
+      const key = kvMatch[1].trim().toLowerCase()
+      const value = kvMatch[2].trim()
+
+      if (key === 'event') details.event = value
+      else if (key === 'location address') details.locationAddress = value
+      else if (key === 'date') details.dateString = value
+      else if (key === 'sport') details.sport = value
+      else if (key === 'level') details.level = value
+      else if (key === 'team') details.team = value
+      else if (key === 'site') details.site = value
+      else if (key === 'subsite') details.subsite = value
+      continue
+    }
+
+    // Official format: "Name Position: Role"
+    // "Doug Helfrich Position: Referee"
+    // "Nigel Lear Position: AR 1"
+    const officialMatch = line.match(/^(.+?)\s+Position:\s*(.+)/)
+    if (officialMatch) {
+      details.officials.push({
+        name: officialMatch[1].trim(),
+        position: officialMatch[2].trim(),
+      })
+      continue
+    }
+
+    // URL
+    if (line.startsWith('http')) {
+      details.url = line
+    }
+  }
+
+  return details
+}
+
+// Determine if this is an Arbiter feed based on description content
+function isArbiterDescription(description: string): boolean {
+  return description.includes('Position:') && description.includes('Event:')
+}
+
+// Determine if this is an Assignr feed based on description content
+function isAssignrDescription(description: string): boolean {
+  return description.includes('vs.') && (description.includes('R:') || description.includes('AR:'))
+}
+
 // Extract teams from fixture data based on source patterns
 export function extractTeams(summary: string, description: string, location?: string): { homeTeam: string; awayTeam: string; competition?: string } {
-  // Pattern 0: Assignr - parse the description for teams
-  const assignrDetails = parseAssignrDescription(description)
-  if (assignrDetails.homeTeam && assignrDetails.awayTeam) {
-    return {
-      homeTeam: assignrDetails.homeTeam,
-      awayTeam: assignrDetails.awayTeam,
+  // Pattern 0a: Arbiter - use Event/Team from description
+  if (isArbiterDescription(description)) {
+    const arbiter = parseArbiterDescription(description)
+    if (arbiter.event && arbiter.team) {
+      return {
+        homeTeam: arbiter.team,
+        awayTeam: arbiter.event,
+      }
+    }
+    if (arbiter.event) {
+      return {
+        homeTeam: arbiter.event,
+        awayTeam: '',
+      }
+    }
+  }
+
+  // Pattern 0b: Assignr - parse the description for teams
+  if (isAssignrDescription(description)) {
+    const assignrDetails = parseAssignrDescription(description)
+    if (assignrDetails.homeTeam && assignrDetails.awayTeam) {
+      return {
+        homeTeam: assignrDetails.homeTeam,
+        awayTeam: assignrDetails.awayTeam,
+      }
     }
   }
 
   // Pattern 1: Vieira/RQ+ style - "Southwest Baptist at Maryville (MO) (12:00PM CDT)"
-  // The description contains "Team A at Team B (time)"
   const atMatch = description.match(/^(.+?)\s+at\s+(.+?)\s*\(/)
   if (atMatch) {
     return {
@@ -298,8 +438,7 @@ export function extractTeams(summary: string, description: string, location?: st
     }
   }
 
-  // Pattern 3: Eventlink style - "Soccer (Boys V) - John Burroughs High School"
-  // Venue/location is the home team, summary after dash is away team
+  // Pattern 3: Eventlink style
   const eventlinkMatch = summary.match(/-\s+(.+)$/)
   if (eventlinkMatch) {
     return {
@@ -308,7 +447,7 @@ export function extractTeams(summary: string, description: string, location?: st
     }
   }
 
-  // Pattern 4: Assignr style - "U14 Boys" or "U13 AD" - no teams, just age group
+  // Pattern 4: Assignr style summary only - "U14 Boys" or "U13 AD"
   const assignrMatch = summary.match(/^(U\d+\s+\w+)/)
   if (assignrMatch) {
     return {
@@ -317,8 +456,7 @@ export function extractTeams(summary: string, description: string, location?: st
     }
   }
 
-  // Pattern 5: Arbiter style - often has game info in summary like "Boys Varsity Soccer"
-  // and teams in description. Try to find "vs" or "at" in description
+  // Pattern 5: Generic vs in description
   const descVsMatch = description.match(/^(.+?)\s+(?:vs?|VS?|Vs|@)\s+(.+?)$/mi)
   if (descVsMatch) {
     return {
@@ -327,7 +465,7 @@ export function extractTeams(summary: string, description: string, location?: st
     }
   }
 
-  // Fallback: use summary as home team
+  // Fallback
   return {
     homeTeam: summary.trim() || 'Unknown',
     awayTeam: '',
@@ -337,28 +475,104 @@ export function extractTeams(summary: string, description: string, location?: st
 // Extract role from fixture data
 // NOTE: Must return valid values from fixture_roles table:
 // referee, ar1, ar2, fourth_official, mentor, assessor, var, other
-export function extractRole(summary: string, description: string): string {
-  // Check summary for role abbreviations
+export function extractRole(summary: string, description: string, userName?: string): string {
+  const upperDesc = description.toUpperCase()
   const upperSummary = summary.toUpperCase()
 
-  // Assignr: "U13 AD" = Assistant Referee, "U14 CR" = Center Referee
+  // Check if this is Arbiter format with Position lines
+  if (isArbiterDescription(description)) {
+    const arbiter = parseArbiterDescription(description)
+    // Find the official matching the user's name (if provided)
+    // Otherwise find "Nigel Lear" or just use first official
+    const targetName = userName ? userName.toLowerCase() : 'lear'
+    
+    for (const official of arbiter.officials) {
+      const officialNameLower = official.name.toLowerCase()
+      if (!userName || officialNameLower.includes(targetName) || targetName.includes(officialNameLower)) {
+        const pos = official.position.toUpperCase()
+        if (pos.includes('AR 1') || pos.includes('AR1') || pos.includes('ASSISTANT')) return 'ar1'
+        if (pos.includes('AR 2') || pos.includes('AR2')) return 'ar2'
+        if (pos.includes('REFEREE') && !pos.includes('ASSISTANT')) return 'referee'
+        if (pos.includes('4TH') || pos.includes('FOURTH')) return 'fourth_official'
+      }
+    }
+    
+    // If no match found, check all officials for any role indicator
+    for (const official of arbiter.officials) {
+      const pos = official.position.toUpperCase()
+      if (pos.includes('AR 1') || pos.includes('AR1')) return 'ar1'
+      if (pos.includes('AR 2') || pos.includes('AR2')) return 'ar2'
+      if (pos.includes('REFEREE') && !pos.includes('ASSISTANT')) return 'referee'
+      if (pos.includes('4TH') || pos.includes('FOURTH')) return 'fourth_official'
+    }
+  }
+
+  // Check if this is Assignr format
+  if (isAssignrDescription(description)) {
+    const assignr = parseAssignrDescription(description)
+    // Check if user is listed as R, AR, etc
+    // For now, check summary for role abbreviations
+    if (/\bAD\b/.test(upperSummary)) return 'ar1'
+    if (/\bAR\b/.test(upperSummary)) return 'ar1'
+    if (/\bCR\b/.test(upperSummary)) return 'referee'
+    
+    // Check description for user's role
+    // "R: Lear, Nigel" - user is referee
+    // "AR: Lear, Nigel" - user is AR1
+    if (upperDesc.includes('R:') && upperDesc.includes('LEAR')) return 'referee'
+    if (upperDesc.includes('AR:') && upperDesc.includes('LEAR')) return 'ar1'
+  }
+
+  // Generic checks
   if (/\bAD\b/.test(upperSummary)) return 'ar1'
   if (/\bAR\b/.test(upperSummary)) return 'ar1'
   if (/\bCR\b/.test(upperSummary)) return 'referee'
   if (/\b4TH\b/.test(upperSummary)) return 'fourth_official'
 
-  // Check description for role mentions
-  const upperDesc = description.toUpperCase()
   if (upperDesc.includes('CENTER REFEREE') || upperDesc.includes('CR ')) return 'referee'
   if (upperDesc.includes('ASSISTANT REFEREE') || upperDesc.includes('AR1')) return 'ar1'
   if (upperDesc.includes('AR2')) return 'ar2'
   if (upperDesc.includes('FOURTH OFFICIAL')) return 'fourth_official'
 
-  // Arbiter often puts role in description like "Referee" or "Assistant Referee"
-  if (upperDesc.includes('ASSISTANT REFEREE')) return 'ar1'
   if (upperDesc.includes('REFEREE')) return 'referee'
 
-  // Default
+  return 'referee'
+}
+
+// Extract user's specific role from Arbiter/Assignr description
+export function extractUserRole(description: string, userFullName: string): string {
+  const nameParts = userFullName.toLowerCase().split(/\s+/).filter(p => p.length > 2)
+  
+  // Check Arbiter format
+  if (isArbiterDescription(description)) {
+    const arbiter = parseArbiterDescription(description)
+    for (const official of arbiter.officials) {
+      const officialLower = official.name.toLowerCase()
+      // Match if any significant part of the name matches
+      const nameMatch = nameParts.some(part => officialLower.includes(part))
+      if (nameMatch) {
+        const pos = official.position.toUpperCase()
+        if (pos.includes('AR 1') || pos.includes('AR1') || pos.includes('ASSISTANT')) return 'ar1'
+        if (pos.includes('AR 2') || pos.includes('AR2')) return 'ar2'
+        if (pos.includes('REFEREE') && !pos.includes('ASSISTANT')) return 'referee'
+        if (pos.includes('4TH') || pos.includes('FOURTH')) return 'fourth_official'
+      }
+    }
+  }
+  
+  // Check Assignr format
+  if (isAssignrDescription(description)) {
+    const assignr = parseAssignrDescription(description)
+    const descLower = description.toLowerCase()
+    // Look for "R: Last, First" or "AR: Last, First" containing user's name
+    for (const part of nameParts) {
+      const rMatch = descLower.match(new RegExp(`r:\\s*[^\\n]*${part}[^\\n]*`, 'i'))
+      if (rMatch) return 'referee'
+      const arMatch = descLower.match(new RegExp(`ar:\\s*[^\\n]*${part}[^\\n]*`, 'i'))
+      if (arMatch) return 'ar1'
+    }
+  }
+  
   return 'referee'
 }
 
