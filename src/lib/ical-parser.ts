@@ -23,19 +23,16 @@ function parseDateTime(value: string, tzid?: string): Date {
   }
 
   // Handle TZID=America/Chicago:20260913T090000
-  const tzMatch = value.match(/TZID=([^:]+):(\d{8}T\d{6})/)
-  if (tzMatch) {
-    const dtStr = tzMatch[2].slice(0, 4) + '-' + tzMatch[2].slice(4, 6) + '-' + tzMatch[2].slice(6, 8) + 'T' + tzMatch[2].slice(9, 11) + ':' + tzMatch[2].slice(11, 13) + ':' + tzMatch[2].slice(13, 15)
-    const tz = tzMatch[1]
+  // Note: tzid is passed separately from value
+  if (tzid && /^\d{8}T\d{6}$/.test(value)) {
+    const dtStr = value.slice(0, 4) + '-' + value.slice(4, 6) + '-' + value.slice(6, 8) + 'T' + value.slice(9, 11) + ':' + value.slice(11, 13) + ':' + value.slice(13, 15)
+    const tz = tzid
     
     try {
-      // Use Intl.DateTimeFormat to find the offset for this specific date
-      // Create a date object from the local time string
-      const localDate = new Date(dtStr)
+      // Format a known UTC date in the target timezone to find the offset
+      const testDate = new Date('2026-10-18T00:00:00Z') // Known UTC time
       
-      // Format this date in the target timezone and in UTC
-      // Then compare to find the offset
-      const formatInTz = new Intl.DateTimeFormat('en-US', {
+      const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: tz,
         year: 'numeric',
         month: '2-digit',
@@ -46,48 +43,35 @@ function parseDateTime(value: string, tzid?: string): Date {
         hour12: false,
       })
       
-      // Get the time in the target timezone when UTC is at our localDate
-      // Actually, we need to work backwards: we know the local time in tz,
-      // we need to find the equivalent UTC time
+      const parts = formatter.formatToParts(testDate)
+      const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0')
       
-      // Approach: Use the fact that toLocaleString with timeZone converts FROM local TO tz
-      // We want the reverse: we have tz time, want UTC
+      const tzYear = getPart('year')
+      const tzMonth = getPart('month')
+      const tzDay = getPart('day')
+      const tzHour = getPart('hour')
+      const tzMinute = getPart('minute')
+      const tzSecond = getPart('second')
       
-      // Simple approach: try different offsets until toLocaleString matches
-      const targetTimeStr = dtStr // e.g. "2026-10-17T11:00:00"
+      // Calculate the time difference between UTC and target timezone
+      const utcMs = testDate.getTime()
+      const tzMs = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMinute, tzSecond)
+      const offsetMs = tzMs - utcMs
       
-      // Binary search for correct UTC time
-      // Start with a guess: assume it's UTC, then adjust
-      let guess = new Date(targetTimeStr + 'Z').getTime()
+      // Now parse our target time as if it's UTC, then subtract the offset
+      const targetAsUtc = new Date(dtStr + 'Z')
+      const resultMs = targetAsUtc.getTime() - offsetMs
       
-      for (let iteration = 0; iteration < 5; iteration++) {
-        const guessDate = new Date(guess)
-        const formatted = formatInTz.format(guessDate)
-        
-        // Parse formatted back to compare
-        const formattedParts = formatInTz.formatToParts(guessDate)
-        const getPart = (type: string) => formattedParts.find(p => p.type === type)?.value || '00'
-        const formattedStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
-        
-        if (formattedStr === targetTimeStr) {
-          // Found it!
-          return new Date(guess)
-        }
-        
-        // Calculate difference and adjust guess
-        const targetMs = new Date(targetTimeStr).getTime()
-        const formattedMs = new Date(formattedStr).getTime()
-        const diff = targetMs - formattedMs
-        
-        guess += diff
+      if (isNaN(resultMs)) {
+        console.log('NaN result!', { dtStr, offsetMs, targetAsUtc: targetAsUtc.getTime() })
+        return new Date(dtStr)
       }
       
-      // If binary search didn't converge, return the best guess
-      return new Date(guess)
+      return new Date(resultMs)
     } catch (e) {
       console.error('Timezone parsing error:', e)
+      return new Date(dtStr)
     }
-    return new Date(dtStr)
   }
 
   // Handle UTC 20250915T190000Z
@@ -255,7 +239,8 @@ export function parseAssignrDescription(description: string): AssignrDetails {
       const awayPart = vsMatch[2].trim()
 
       // Extract team name and short name from "Name (Short)"
-      const homeMatch = homePart.match(/^(.+?)\s*\(([^)]+)\)\s*$/)
+      // Use greedy match to find the LAST (text) at the end
+      const homeMatch = homePart.match(/^(.+)\s+\(([^)]+)\)$/)
       if (homeMatch) {
         details.homeTeam = homeMatch[1].trim()
         details.homeTeamShort = homeMatch[2].trim()
@@ -263,7 +248,7 @@ export function parseAssignrDescription(description: string): AssignrDetails {
         details.homeTeam = homePart
       }
 
-      const awayMatch = awayPart.match(/^(.+?)\s*\(([^)]+)\)\s*$/)
+      const awayMatch = awayPart.match(/^(.+)\s+\(([^)]+)\)$/)
       if (awayMatch) {
         details.awayTeam = awayMatch[1].trim()
         details.awayTeamShort = awayMatch[2].trim()
@@ -273,13 +258,16 @@ export function parseAssignrDescription(description: string): AssignrDetails {
       continue
     }
 
-    // Officials
-    const officialMatch = line.match(/^([A-Z]+):\s*(.+)/)
+    // Officials - match R:, AR1:, AR2:, 4TH:
+    const officialMatch = line.match(/^([A-Z]+\d*):\s*(.+)/)
     if (officialMatch) {
       const role = officialMatch[1].trim()
       const name = officialMatch[2].trim()
       if (role === 'R') details.referee = name
+      if (role === 'AR1') details.ar1 = name
+      if (role === 'AR2') details.ar2 = name
       if (role === 'AR') {
+        // Fallback for plain AR (without number)
         if (!details.ar1) details.ar1 = name
         else if (!details.ar2) details.ar2 = name
       }
@@ -550,12 +538,23 @@ export function extractUserRole(description: string, userFullName: string): stri
   if (isAssignrDescription(description)) {
     const assignr = parseAssignrDescription(description)
     const descLower = description.toLowerCase()
-    // Look for "R: Last, First" or "AR: Last, First" containing user's name
-    for (const part of nameParts) {
-      const rMatch = descLower.match(new RegExp(`r:\\s*[^\\n]*${part}[^\\n]*`, 'i'))
-      if (rMatch) return 'referee'
-      const arMatch = descLower.match(new RegExp(`ar:\\s*[^\\n]*${part}[^\\n]*`, 'i'))
-      if (arMatch) return 'ar1'
+    
+    // Check each official line for user's name
+    // Lines are like: "R: Lear, Nigel" or "AR1: Lear, Nigel" or "AR2: Lear, Nigel"
+    const lines = description.split('\\n')
+    for (const line of lines) {
+      const officialMatch = line.match(/^([A-Z]+\d*):\s*(.+)/)
+      if (officialMatch) {
+        const role = officialMatch[1]
+        const name = officialMatch[2].toLowerCase()
+        const nameMatch = nameParts.some(part => name.includes(part))
+        if (nameMatch) {
+          if (role === 'R') return 'referee'
+          if (role === 'AR1') return 'ar1'
+          if (role === 'AR2') return 'ar2'
+          if (role === 'AR') return 'ar1' // fallback
+        }
+      }
     }
   }
   
