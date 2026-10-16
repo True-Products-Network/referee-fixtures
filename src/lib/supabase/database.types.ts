@@ -468,6 +468,48 @@ export interface Database {
         }
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          notification_type: string
+          title: string
+          description: string | null
+          push_enabled: boolean
+          email_enabled: boolean
+          icon: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          notification_type: string
+          title: string
+          description?: string | null
+          push_enabled?: boolean
+          email_enabled?: boolean
+          icon?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          notification_type?: string
+          title?: string
+          description?: string | null
+          push_enabled?: boolean
+          email_enabled?: boolean
+          icon?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
