@@ -113,6 +113,8 @@ export function parseICS(icsData: string): ParsedFixture[] {
   const lines = unfoldLines(icsData)
 
   let inEvent = false
+  let inNested = false
+  let nestedDepth = 0
   let uid = ''
   let summary = ''
   let description = ''
@@ -127,6 +129,8 @@ export function parseICS(icsData: string): ParsedFixture[] {
   for (const line of lines) {
     if (line === 'BEGIN:VEVENT') {
       inEvent = true
+      inNested = false
+      nestedDepth = 0
       uid = ''
       summary = ''
       description = ''
@@ -142,6 +146,8 @@ export function parseICS(icsData: string): ParsedFixture[] {
 
     if (line === 'END:VEVENT') {
       inEvent = false
+      inNested = false
+      nestedDepth = 0
       rawEvent += line + '\n'
 
       if (uid && start) {
@@ -161,6 +167,23 @@ export function parseICS(icsData: string): ParsedFixture[] {
 
     if (inEvent) {
       rawEvent += line + '\n'
+
+      // Skip nested components (VALARM, VTIMEZONE, etc)
+      if (line.startsWith('BEGIN:')) {
+        inNested = true
+        nestedDepth++
+        continue
+      }
+      if (line.startsWith('END:')) {
+        nestedDepth--
+        if (nestedDepth === 0) {
+          inNested = false
+        }
+        continue
+      }
+      if (inNested) {
+        continue
+      }
 
       if (line.startsWith('UID:')) {
         uid = line.slice(4)
@@ -541,18 +564,29 @@ export function extractUserRole(description: string, userFullName: string): stri
     
     // Check each official line for user's name
     // Lines are like: "R: Lear, Nigel" or "AR1: Lear, Nigel" or "AR2: Lear, Nigel"
+    // For plain "AR:", track which position (first = ar1, second = ar2)
+    let arCount = 0
     const lines = description.split('\\n')
     for (const line of lines) {
       const officialMatch = line.match(/^([A-Z]+\d*):\s*(.+)/)
       if (officialMatch) {
         const role = officialMatch[1]
         const name = officialMatch[2].toLowerCase()
+        
+        // Count AR positions for plain AR: lines
+        if (role === 'AR') {
+          arCount++
+        }
+        
         const nameMatch = nameParts.some(part => name.includes(part))
         if (nameMatch) {
           if (role === 'R') return 'referee'
           if (role === 'AR1') return 'ar1'
           if (role === 'AR2') return 'ar2'
-          if (role === 'AR') return 'ar1' // fallback
+          if (role === 'AR') {
+            // First AR = ar1, second AR = ar2
+            return arCount === 1 ? 'ar1' : 'ar2'
+          }
         }
       }
     }
