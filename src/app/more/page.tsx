@@ -53,21 +53,21 @@ export default function MorePage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen pb-20 bg-background">
-      <header className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+    <div className="h-screen flex flex-col bg-background">
+      <header className="flex-none bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <h1 className="text-lg font-bold">More</h1>
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-4 space-y-6">
+      <main className="flex-1 overflow-y-auto max-w-lg mx-auto w-full px-4 py-4 space-y-6">
         {/* User Profile Summary */}
         <Card>
           <CardContent className="p-4">

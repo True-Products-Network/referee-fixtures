@@ -81,3 +81,43 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Prevent content from scrolling behind fixed nav */
+html {
+  overflow: hidden;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  height: 100%;
+  position: fixed;
+  width: 100%;
+}
+
+/* Main scrollable area */
+.scrollable-content {
+  height: calc(100vh - 3.5rem - 3.5rem); /* viewport - header - bottom nav */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area for fixed header */
+.fixed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  height: 3.5rem;
+}
+
+/* Safe area for fixed bottom nav */
+.fixed-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 3.5rem;
+}
