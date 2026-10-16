@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
     }
 
     const fixtures = parseICS(icsData)
+    
+    console.log('Test-feed parsed', fixtures.length, 'fixtures')
+    if (fixtures.length > 0) {
+      console.log('First fixture description:', fixtures[0].description)
+      console.log('First fixture summary:', fixtures[0].summary)
+    }
 
     return NextResponse.json({
       url: httpsUrl,
