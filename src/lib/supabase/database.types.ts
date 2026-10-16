@@ -510,6 +510,51 @@ export interface Database {
         }
         Relationships: []
       }
+      review_queue: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          fixture_id: string
+          issue_type: string
+          issue_key: string
+          description: string | null
+          severity: string
+          status: string
+          created_at: string
+          updated_at: string
+          resolved_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          fixture_id: string
+          issue_type: string
+          issue_key: string
+          description?: string | null
+          severity?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          fixture_id?: string
+          issue_type?: string
+          issue_key?: string
+          description?: string | null
+          severity?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

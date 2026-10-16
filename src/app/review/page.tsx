@@ -14,113 +14,170 @@ interface Fixture {
   away_team: string
   kickoff_start: string
   venue_name: string | null
-  location: string | null
   role: string
   competition: string | null
   crew_names: string[] | null
   source_name: string
-  appointment_status: string
 }
 
 interface ReviewIssue {
   id: string
   fixture_id: string
-  type: "missing_venue" | "missing_time" | "unassigned_crew" | "duplicate" | "incomplete"
-  severity: "warning" | "error"
+  type: string
+  severity: string
   description: string
   fixture: Fixture
+  issue_key: string
+}
+
+interface StoredIssue {
+  issue_key: string
+  status: string
 }
 
 export default function ReviewQueuePage() {
-  const [fixtures, setFixtures] = useState<Fixture[]>([])
   const [issues, setIssues] = useState<ReviewIssue[]>([])
+  const [storedIssues, setStoredIssues] = useState<StoredIssue[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(null)
-  const [dismissedIds, setDismissedIds] = useState<string[]>([])
+  const [processingIds, setProcessingIds] = useState<string[]>([])
 
-  const fetchFixtures = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/fixtures?from=2026-01-01&to=2027-12-31')
-      if (res.ok) {
-        const data = await res.json()
-        const loaded = data.fixtures || []
-        setFixtures(loaded)
-        analyzeIssues(loaded)
+      
+      // Fetch stored issues (dismissed/resolved)
+      const storedRes = await fetch('/api/review-queue')
+      let stored: StoredIssue[] = []
+      if (storedRes.ok) {
+        const data = await storedRes.json()
+        stored = data.issues || []
       }
+      setStoredIssues(stored)
+      const storedKeys = new Set(stored.map((i: StoredIssue) => i.issue_key))
+
+      // Fetch fixtures
+      const fixturesRes = await fetch('/api/fixtures?from=2026-01-01&to=2027-12-31')
+      if (!fixturesRes.ok) {
+        setLoading(false)
+        return
+      }
+      
+      const data = await fixturesRes.json()
+      const fixtures: Fixture[] = data.fixtures || []
+      
+      // Analyze issues
+      const found: ReviewIssue[] = []
+      const seen = new Map<string, string>()
+
+      fixtures.forEach((fixture) => {
+        // Check for missing venue
+        if (!fixture.venue_name || fixture.venue_name === 'TBD') {
+          const issueKey = `venue-${fixture.id}`
+          if (!storedKeys.has(issueKey)) {
+            found.push({
+              id: issueKey,
+              fixture_id: fixture.id,
+              type: "missing_venue",
+              severity: "error",
+              description: `No venue assigned`,
+              fixture,
+              issue_key: issueKey,
+            })
+          }
+        }
+
+        // Check for unassigned crew
+        if (!fixture.crew_names || fixture.crew_names.length === 0) {
+          const issueKey = `crew-${fixture.id}`
+          if (!storedKeys.has(issueKey)) {
+            found.push({
+              id: issueKey,
+              fixture_id: fixture.id,
+              type: "unassigned_crew",
+              severity: "warning",
+              description: `No crew members listed`,
+              fixture,
+              issue_key: issueKey,
+            })
+          }
+        }
+
+        // Check for duplicates
+        const key = `${fixture.home_team}-${fixture.away_team}-${fixture.kickoff_start}`
+        if (seen.has(key)) {
+          const issueKey = `dup-${fixture.id}`
+          if (!storedKeys.has(issueKey)) {
+            found.push({
+              id: issueKey,
+              fixture_id: fixture.id,
+              type: "duplicate",
+              severity: "warning",
+              description: `Possible duplicate fixture`,
+              fixture,
+              issue_key: issueKey,
+            })
+          }
+        } else {
+          seen.set(key, fixture.id)
+        }
+
+        // Check for incomplete data
+        if (fixture.home_team === 'TBD' || fixture.away_team === 'TBD') {
+          const issueKey = `incomplete-${fixture.id}`
+          if (!storedKeys.has(issueKey)) {
+            found.push({
+              id: issueKey,
+              fixture_id: fixture.id,
+              type: "incomplete",
+              severity: "warning",
+              description: `Team information incomplete`,
+              fixture,
+              issue_key: issueKey,
+            })
+          }
+        }
+      })
+
+      setIssues(found)
     } catch (err) {
-      console.error('Failed to fetch fixtures:', err)
+      console.error('Failed to fetch data:', err)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchFixtures()
-  }, [fetchFixtures])
+    fetchData()
+  }, [fetchData])
 
-  function analyzeIssues(fixtures: Fixture[]) {
-    const found: ReviewIssue[] = []
-    const seen = new Map<string, string>() // key -> fixture_id
-
-    fixtures.forEach((fixture) => {
-      // Check for missing venue
-      if (!fixture.venue_name || fixture.venue_name === 'TBD') {
-        found.push({
-          id: `venue-${fixture.id}`,
-          fixture_id: fixture.id,
-          type: "missing_venue",
-          severity: "error",
-          description: `No venue assigned for ${fixture.home_team} vs ${fixture.away_team}`,
-          fixture,
+  async function handleAction(issue: ReviewIssue, action: 'dismiss' | 'resolve') {
+    setProcessingIds(prev => [...prev, issue.id])
+    
+    try {
+      const res = await fetch('/api/review-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          issueKey: issue.issue_key,
+          fixtureId: issue.fixture_id,
+          issueType: issue.type,
+          description: issue.description,
+          severity: issue.severity,
         })
+      })
+
+      if (res.ok) {
+        // Remove from local state
+        setIssues(prev => prev.filter(i => i.id !== issue.id))
+        setSelectedIssue(null)
       }
-
-      // Check for unassigned crew
-      if (!fixture.crew_names || fixture.crew_names.length === 0) {
-        found.push({
-          id: `crew-${fixture.id}`,
-          fixture_id: fixture.id,
-          type: "unassigned_crew",
-          severity: "warning",
-          description: `No crew members listed for this fixture`,
-          fixture,
-        })
-      }
-
-      // Check for duplicates (same teams, same time)
-      const key = `${fixture.home_team}-${fixture.away_team}-${fixture.kickoff_start}`
-      if (seen.has(key)) {
-        found.push({
-          id: `dup-${fixture.id}`,
-          fixture_id: fixture.id,
-          type: "duplicate",
-          severity: "warning",
-          description: `Possible duplicate: Same fixture exists multiple times`,
-          fixture,
-        })
-      } else {
-        seen.set(key, fixture.id)
-      }
-
-      // Check for incomplete data
-      if (fixture.home_team === 'TBD' || fixture.away_team === 'TBD') {
-        found.push({
-          id: `incomplete-${fixture.id}`,
-          fixture_id: fixture.id,
-          type: "incomplete",
-          severity: "warning",
-          description: `Team information incomplete`,
-          fixture,
-        })
-      }
-    })
-
-    setIssues(found)
-  }
-
-  function dismissIssue(id: string) {
-    setDismissedIds(prev => [...prev, id])
+    } catch (err) {
+      console.error('Failed to update issue:', err)
+    } finally {
+      setProcessingIds(prev => prev.filter(id => id !== issue.id))
+    }
   }
 
   function getSeverityColor(severity: string) {
@@ -136,8 +193,6 @@ export default function ReviewQueuePage() {
       default: return <Badge>Issue</Badge>
     }
   }
-
-  const activeIssues = issues.filter(i => !dismissedIds.includes(i.id))
 
   if (loading) {
     return (
@@ -159,7 +214,7 @@ export default function ReviewQueuePage() {
             </Button>
             <h1 className="text-lg font-bold">Review Queue</h1>
           </div>
-          <Badge variant="secondary">{activeIssues.length} issues</Badge>
+          <Badge variant="secondary">{issues.length} issues</Badge>
         </div>
       </header>
 
@@ -168,16 +223,21 @@ export default function ReviewQueuePage() {
           Review and resolve potential issues with your fixtures.
         </p>
 
-        {activeIssues.length === 0 ? (
+        {issues.length === 0 ? (
           <div className="text-center py-12">
             <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">All Clear!</h2>
             <p className="text-sm text-muted-foreground">
               No issues found with your fixtures.
             </p>
+            {storedIssues.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {storedIssues.length} previously resolved/dismissed
+              </p>
+            )}
           </div>
         ) : (
-          activeIssues.map((issue) => (
+          issues.map((issue) => (
             <Card key={issue.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -216,6 +276,7 @@ export default function ReviewQueuePage() {
                     size="sm" 
                     className="flex-1"
                     onClick={() => setSelectedIssue(issue)}
+                    disabled={processingIds.includes(issue.id)}
                   >
                     Review
                   </Button>
@@ -223,9 +284,14 @@ export default function ReviewQueuePage() {
                     variant="ghost" 
                     size="sm" 
                     className="text-red-500"
-                    onClick={() => dismissIssue(issue.id)}
+                    onClick={() => handleAction(issue, 'dismiss')}
+                    disabled={processingIds.includes(issue.id)}
                   >
-                    Dismiss
+                    {processingIds.includes(issue.id) ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Dismiss'
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -263,7 +329,7 @@ export default function ReviewQueuePage() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Suggested Actions:</p>
                   <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/fixtures/${selectedIssue.fixture.id}`}>
+                    <Link href={`/fixtures/${selectedIssue.fixture.id}`} onClick={() => setSelectedIssue(null)}>
                       Edit Fixture to Add Venue
                     </Link>
                   </Button>
@@ -274,7 +340,7 @@ export default function ReviewQueuePage() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Suggested Actions:</p>
                   <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/fixtures/${selectedIssue.fixture.id}`}>
+                    <Link href={`/fixtures/${selectedIssue.fixture.id}`} onClick={() => setSelectedIssue(null)}>
                       View Fixture Details
                     </Link>
                   </Button>
@@ -284,17 +350,20 @@ export default function ReviewQueuePage() {
               <div className="flex gap-2 pt-2">
                 <Button 
                   className="flex-1" 
-                  onClick={() => {
-                    dismissIssue(selectedIssue.id)
-                    setSelectedIssue(null)
-                  }}
+                  onClick={() => handleAction(selectedIssue, 'resolve')}
+                  disabled={processingIds.includes(selectedIssue.id)}
                 >
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {processingIds.includes(selectedIssue.id) ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                  )}
                   Mark Resolved
                 </Button>
                 <Button 
                   variant="ghost" 
                   onClick={() => setSelectedIssue(null)}
+                  disabled={processingIds.includes(selectedIssue.id)}
                 >
                   <X className="w-4 h-4" />
                 </Button>
