@@ -10,10 +10,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's tenant_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
+
+    const tenantId = userData?.tenant_id || user.id
+
     const { data: rules, error } = await supabase
       .from('arrival_rules')
       .select('*')
-      .eq('tenant_id', user.id)
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true })
 
     if (error) {
@@ -40,13 +49,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's tenant_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
+
+    const tenantId = userData?.tenant_id || user.id
+
     const { rules } = await request.json()
 
-    // Delete existing rules for this user
+    // Delete existing rules for this tenant
     await supabase
       .from('arrival_rules')
       .delete()
-      .eq('tenant_id', user.id)
+      .eq('tenant_id', tenantId)
 
     // Insert new rules
     if (rules && rules.length > 0) {
@@ -54,7 +72,7 @@ export async function POST(request: NextRequest) {
         .from('arrival_rules')
         .insert(
           rules.map((rule: any) => ({
-            tenant_id: user.id,
+            tenant_id: tenantId,
             scope_type: 'user',
             scope_id: user.id,
             competition_type: rule.competition_type,
