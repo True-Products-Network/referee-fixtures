@@ -37,6 +37,21 @@ function getStatusBadgeVariant(status: string) {
   }
 }
 
+function formatDuration(minutes: number): string {
+  if (minutes <= 0) return "Now"
+  
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const mins = minutes % 60
+  
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}d`)
+  if (hours > 0) parts.push(`${hours}h`)
+  if (mins > 0 || parts.length === 0) parts.push(`${mins}m`)
+  
+  return parts.join(" ")
+}
+
 function formatKickoffTime(kickoff: string) {
   const date = new Date(kickoff)
   if (isToday(date)) {
@@ -209,7 +224,7 @@ export default function TodayPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Next departure</p>
                     <p className="text-3xl font-bold">
-                      {countdown !== null ? `${countdown} min` : "--"}
+                      {countdown !== null ? formatDuration(countdown) : "--"}
                     </p>
                   </div>
                   {travelWarning && (

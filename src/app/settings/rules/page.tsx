@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ChevronLeft, Plus, Trash2, Clock } from "lucide-react"
+import { ChevronLeft, Plus, Trash2, Clock, CheckCircle2, AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,27 @@ interface ArrivalRule {
   match_duration_minutes: number
   post_match_buffer_minutes: number
 }
+
+const COMPETITION_OPTIONS = [
+  "All Competitions",
+  "Varsity",
+  "Junior Varsity",
+  "Freshman",
+  "Club",
+  "Adult League",
+  "Recreational",
+  "Tournament",
+  "Playoff",
+  "Scrimmage",
+]
+
+const ROLE_OPTIONS = [
+  { value: "", label: "All Roles" },
+  { value: "referee", label: "Referee (Center)" },
+  { value: "ar1", label: "AR1 (Assistant Referee 1)" },
+  { value: "ar2", label: "AR2 (Assistant Referee 2)" },
+  { value: "fourth_official", label: "Fourth Official" },
+]
 
 const defaultRules: ArrivalRule[] = [
   {
@@ -37,6 +58,7 @@ export default function ArrivalRulesPage() {
   const [rules, setRules] = useState<ArrivalRule[]>(defaultRules)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
   useEffect(() => {
     fetchRules()
@@ -62,16 +84,24 @@ export default function ArrivalRulesPage() {
   async function saveRules() {
     try {
       setSaving(true)
+      setSaveStatus('idle')
       const res = await fetch('/api/arrival-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rules })
       })
-      if (!res.ok) {
-        console.error('Failed to save rules')
+      if (res.ok) {
+        setSaveStatus('success')
+        // Clear success message after 3 seconds
+        setTimeout(() => setSaveStatus('idle'), 3000)
+      } else {
+        const data = await res.json()
+        console.error('Failed to save rules:', data.error)
+        setSaveStatus('error')
       }
     } catch (err) {
       console.error('Failed to save rules:', err)
+      setSaveStatus('error')
     } finally {
       setSaving(false)
     }
@@ -142,12 +172,29 @@ export default function ArrivalRulesPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label>Competition Type</Label>
-                <Input
+                <select
                   value={rule.competition_type || ""}
-                  onChange={(e) => updateRule(rule.id, "competition_type", e.target.value)}
-                  placeholder="e.g. Varsity, JV, Adult League"
-                  className="mt-1"
-                />
+                  onChange={(e) => updateRule(rule.id, "competition_type", e.target.value || null)}
+                  className="w-full mt-1 p-2 border rounded-md text-sm bg-white dark:bg-gray-900"
+                >
+                  <option value="">Select competition...</option>
+                  {COMPETITION_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label>Role (optional)</Label>
+                <select
+                  value={rule.role || ""}
+                  onChange={(e) => updateRule(rule.id, "role", e.target.value || null)}
+                  className="w-full mt-1 p-2 border rounded-md text-sm bg-white dark:bg-gray-900"
+                >
+                  {ROLE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -200,6 +247,18 @@ export default function ArrivalRulesPage() {
           Add Rule
         </Button>
 
+        {saveStatus === 'success' && (
+          <div className="flex items-center gap-2 text-green-600 text-sm">
+            <CheckCircle2 className="w-4 h-4" />
+            Rules saved successfully
+          </div>
+        )}
+        {saveStatus === 'error' && (
+          <div className="flex items-center gap-2 text-red-600 text-sm">
+            <AlertTriangle className="w-4 h-4" />
+            Failed to save rules
+          </div>
+        )}
         <Button className="w-full" onClick={saveRules} disabled={saving}>
           {saving ? "Saving..." : "Save Rules"}
         </Button>
