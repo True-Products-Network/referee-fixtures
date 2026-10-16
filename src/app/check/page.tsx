@@ -14,6 +14,7 @@ import { BottomNav } from "@/components/bottom-nav"
 interface CheckResult {
   status: 'available' | 'tight' | 'unavailable' | 'unknown'
   reason: string
+  conflictFixture?: { time: string; venue: string; travelTime: number; distanceMiles: number | null }
   beforeFixture?: { time: string; venue: string; travelTime: number; distanceMiles: number | null }
   afterFixture?: { time: string; venue: string; travelTime: number; distanceMiles: number | null }
   totalCommitment: string
@@ -351,6 +352,19 @@ export default function CheckPage() {
               </div>
 
               {/* Conflict Details */}
+              {result.conflictFixture && (
+                <div className="mt-3 text-sm bg-red-50 p-2 rounded">
+                  <p className="font-medium text-red-700">Conflicts With:</p>
+                  <p className="opacity-90">
+                    {result.conflictFixture.time} at {result.conflictFixture.venue}
+                    <span className="block text-xs opacity-75">
+                      Travel between: {result.conflictFixture.travelTime} min
+                      {result.conflictFixture.distanceMiles && ` (${result.conflictFixture.distanceMiles.toFixed(1)} mi)`}
+                    </span>
+                  </p>
+                </div>
+              )}
+
               {result.beforeFixture && (
                 <div className="mt-3 text-sm">
                   <p className="font-medium">Fixture Before:</p>
