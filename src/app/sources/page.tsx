@@ -145,6 +145,13 @@ export default function SourcesPage() {
   }
 
   async function handleTest(source: SourceWithDefinition) {
+    // If already showing results for this source, clear them
+    if (testingId === source.id && testResult) {
+      setTestingId(null)
+      setTestResult(null)
+      return
+    }
+    
     setTestingId(source.id)
     setTestResult(null)
     try {
@@ -163,8 +170,7 @@ export default function SourcesPage() {
     } catch (err) {
       setTestResult({ fixturesFound: 0, fixtures: [], error: err instanceof Error ? err.message : 'Unknown error' })
     }
-    // Don't clear testingId here - let the user see the results
-    // They can click Test again or navigate away to clear
+    setTestingId(null)
   }
 
   async function handleSync(source: SourceWithDefinition) {
