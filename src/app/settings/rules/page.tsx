@@ -14,10 +14,10 @@ interface ArrivalRule {
   competition_type: string | null
   role: string | null
   age_group: string | null
-  arrival_lead_minutes: number
-  parking_buffer_minutes: number
-  match_duration_minutes: number
-  post_match_buffer_minutes: number
+  arrival_lead_minutes: number | string
+  parking_buffer_minutes: number | string
+  match_duration_minutes: number | string
+  post_match_buffer_minutes: number | string
 }
 
 const COMPETITION_OPTIONS = [
@@ -59,6 +59,7 @@ export default function ArrivalRulesPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [saveError, setSaveError] = useState<string>('')
 
   useEffect(() => {
     fetchRules()
@@ -85,10 +86,21 @@ export default function ArrivalRulesPage() {
     try {
       setSaving(true)
       setSaveStatus('idle')
+      setSaveError('')
+      
+      // Convert string values to numbers before sending
+      const rulesToSave = rules.map(rule => ({
+        ...rule,
+        arrival_lead_minutes: typeof rule.arrival_lead_minutes === 'string' ? parseInt(rule.arrival_lead_minutes) || 0 : rule.arrival_lead_minutes,
+        parking_buffer_minutes: typeof rule.parking_buffer_minutes === 'string' ? parseInt(rule.parking_buffer_minutes) || 0 : rule.parking_buffer_minutes,
+        match_duration_minutes: typeof rule.match_duration_minutes === 'string' ? parseInt(rule.match_duration_minutes) || 0 : rule.match_duration_minutes,
+        post_match_buffer_minutes: typeof rule.post_match_buffer_minutes === 'string' ? parseInt(rule.post_match_buffer_minutes) || 0 : rule.post_match_buffer_minutes,
+      }))
+      
       const res = await fetch('/api/arrival-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rules })
+        body: JSON.stringify({ rules: rulesToSave })
       })
       if (res.ok) {
         setSaveStatus('success')
@@ -98,10 +110,12 @@ export default function ArrivalRulesPage() {
         const data = await res.json()
         console.error('Failed to save rules:', data.error)
         setSaveStatus('error')
+        setSaveError(data.error || 'Failed to save')
       }
     } catch (err) {
       console.error('Failed to save rules:', err)
       setSaveStatus('error')
+      setSaveError(err instanceof Error ? err.message : 'Network error')
     } finally {
       setSaving(false)
     }
@@ -203,7 +217,7 @@ export default function ArrivalRulesPage() {
                   <Input
                     type="number"
                     value={rule.arrival_lead_minutes}
-                    onChange={(e) => updateRule(rule.id, "arrival_lead_minutes", parseInt(e.target.value) || 0)}
+                    onChange={(e) => updateRule(rule.id, "arrival_lead_minutes", e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                     className="mt-1"
                   />
                 </div>
@@ -212,7 +226,7 @@ export default function ArrivalRulesPage() {
                   <Input
                     type="number"
                     value={rule.parking_buffer_minutes}
-                    onChange={(e) => updateRule(rule.id, "parking_buffer_minutes", parseInt(e.target.value) || 0)}
+                    onChange={(e) => updateRule(rule.id, "parking_buffer_minutes", e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                     className="mt-1"
                   />
                 </div>
@@ -224,7 +238,7 @@ export default function ArrivalRulesPage() {
                   <Input
                     type="number"
                     value={rule.match_duration_minutes}
-                    onChange={(e) => updateRule(rule.id, "match_duration_minutes", parseInt(e.target.value) || 0)}
+                    onChange={(e) => updateRule(rule.id, "match_duration_minutes", e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                     className="mt-1"
                   />
                 </div>
@@ -233,7 +247,7 @@ export default function ArrivalRulesPage() {
                   <Input
                     type="number"
                     value={rule.post_match_buffer_minutes}
-                    onChange={(e) => updateRule(rule.id, "post_match_buffer_minutes", parseInt(e.target.value) || 0)}
+                    onChange={(e) => updateRule(rule.id, "post_match_buffer_minutes", e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                     className="mt-1"
                   />
                 </div>
@@ -256,7 +270,7 @@ export default function ArrivalRulesPage() {
         {saveStatus === 'error' && (
           <div className="flex items-center gap-2 text-red-600 text-sm">
             <AlertTriangle className="w-4 h-4" />
-            Failed to save rules
+            Failed to save rules{saveError ? `: ${saveError}` : ''}
           </div>
         )}
         <Button className="w-full" onClick={saveRules} disabled={saving}>
