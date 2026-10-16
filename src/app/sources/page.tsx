@@ -40,6 +40,15 @@ interface TestResult {
     start: string
     end: string
     location?: string
+    description?: string
+    parsed?: {
+      homeTeam: string
+      awayTeam: string
+      role: string
+      userRole: string
+      assignrDetails?: any
+      arbiterDetails?: any
+    }
   }>
   error?: string
 }
@@ -459,8 +468,18 @@ export default function SourcesPage() {
                           Found {testResult.fixturesFound} fixtures
                         </p>
                         {testResult.fixtures.map((f, i) => (
-                          <div key={i} className="bg-muted p-2 rounded text-xs">
+                          <div key={i} className="bg-muted p-2 rounded text-xs space-y-1">
                             <p className="font-medium">{f.summary}</p>
+                            {f.parsed && (
+                              <>
+                                <p className="text-blue-600">
+                                  {f.parsed.homeTeam} vs {f.parsed.awayTeam}
+                                </p>
+                                <p className="text-amber-600">
+                                  Role: {f.parsed.userRole}
+                                </p>
+                              </>
+                            )}
                             <p className="text-muted-foreground">
                               {new Date(f.start).toLocaleString()}
                             </p>
