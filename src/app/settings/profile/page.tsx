@@ -22,9 +22,7 @@ export default function ProfileSettingsPage() {
 
   useEffect(() => {
     if (user) {
-      setFullName(user.user_metadata?.full_name || "")
-      setPhone(user.user_metadata?.phone || "")
-      // Fetch extended profile from users table
+      // Fetch profile from database (source of truth)
       fetchProfile()
     }
   }, [user])
@@ -34,6 +32,8 @@ export default function ProfileSettingsPage() {
       const res = await fetch('/api/user/profile')
       if (res.ok) {
         const data = await res.json()
+        setFullName(data.full_name || "")
+        setPhone(data.phone || "")
         setHomeAddress(data.home_address || "")
         setMileageRate(data.mileage_rate?.toString() || "0.67")
       }
