@@ -9,6 +9,7 @@ export interface ParsedFixture {
   raw: string
 }
 
+// Parse iCal datetime values properly with timezone awareness
 function parseDateTime(value: string, tzid?: string): Date {
   // Handle VALUE=DATE:20250915
   const dateMatch = value.match(/VALUE=DATE:(\d{8})/)
@@ -20,9 +21,39 @@ function parseDateTime(value: string, tzid?: string): Date {
   }
 
   // Handle TZID=America/Chicago:20260913T090000
+  // The datetime is in the specified timezone, NOT UTC
   const tzMatch = value.match(/TZID=([^:]+):(\d{8}T\d{6})/)
   if (tzMatch) {
     const dtStr = tzMatch[2].slice(0, 4) + '-' + tzMatch[2].slice(4, 6) + '-' + tzMatch[2].slice(6, 8) + 'T' + tzMatch[2].slice(9, 11) + ':' + tzMatch[2].slice(11, 13) + ':' + tzMatch[2].slice(13, 15)
+    // Append the timezone offset so it's parsed correctly
+    // For America/Chicago, we need to know if it's CDT (-05:00) or CST (-06:00)
+    // We'll use the tzid to create a proper ISO string
+    const tz = tzMatch[1]
+    try {
+      // Use Intl.DateTimeFormat to get the offset for the specific date
+      const testDate = new Date(dtStr)
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZoneName: 'shortOffset'
+      })
+      const parts = formatter.formatToParts(testDate)
+      const offsetPart = parts.find(p => p.type === 'timeZoneName')
+      if (offsetPart) {
+        const offset = offsetPart.value.replace('GMT', '').replace('UTC', '')
+        // Convert offset like -05:00 or +00:00
+        const isoStr = dtStr + offset
+        return new Date(isoStr)
+      }
+    } catch {
+      // Fallback: parse as local time
+    }
     return new Date(dtStr)
   }
 
@@ -153,8 +184,101 @@ export function webcalToHttps(url: string): string {
   return url.replace(/^webcal:\/\//, 'https://')
 }
 
+// Parse Assignr description format
+// Example:
+// USOfficials
+// SLSG MO B 2012/2013 NAL St. Charles (St. Louis Scott Gallagher St. Charles) vs. STLDA 2012/13B Elite (NAL) (St. Louis Development Academy)
+// R: Lear, Nigel
+// AR: Roca, Kevin
+// AR: unassigned
+// https://usofficials.assignr.com/games/28063426
+export interface AssignrDetails {
+  organisation?: string
+  homeTeam?: string
+  awayTeam?: string
+  homeTeamShort?: string
+  awayTeamShort?: string
+  referee?: string
+  ar1?: string
+  ar2?: string
+  fourthOfficial?: string
+  url?: string
+  ageGroup?: string
+}
+
+export function parseAssignrDescription(description: string): AssignrDetails {
+  const lines = description.split('\\n').map(l => l.trim()).filter(l => l.length > 0)
+  const details: AssignrDetails = {}
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+
+    // First line is often the organisation (USOfficials, etc)
+    if (i === 0 && !line.includes('vs.') && !line.includes(':') && !line.startsWith('http')) {
+      details.organisation = line
+      continue
+    }
+
+    // vs. line: "Team A (Short A) vs. Team B (Short B)"
+    const vsMatch = line.match(/(.+?)\s+vs\.\s+(.+)/)
+    if (vsMatch) {
+      const homePart = vsMatch[1].trim()
+      const awayPart = vsMatch[2].trim()
+
+      // Extract team name and short name from "Name (Short)"
+      const homeMatch = homePart.match(/^(.+?)\s*\(([^)]+)\)\s*$/)
+      if (homeMatch) {
+        details.homeTeam = homeMatch[1].trim()
+        details.homeTeamShort = homeMatch[2].trim()
+      } else {
+        details.homeTeam = homePart
+      }
+
+      const awayMatch = awayPart.match(/^(.+?)\s*\(([^)]+)\)\s*$/)
+      if (awayMatch) {
+        details.awayTeam = awayMatch[1].trim()
+        details.awayTeamShort = awayMatch[2].trim()
+      } else {
+        details.awayTeam = awayPart
+      }
+      continue
+    }
+
+    // Officials
+    const officialMatch = line.match(/^([A-Z]+):\s*(.+)/)
+    if (officialMatch) {
+      const role = officialMatch[1].trim()
+      const name = officialMatch[2].trim()
+      if (role === 'R') details.referee = name
+      if (role === 'AR') {
+        if (!details.ar1) details.ar1 = name
+        else if (!details.ar2) details.ar2 = name
+      }
+      if (role === '4TH') details.fourthOfficial = name
+      continue
+    }
+
+    // URL
+    if (line.startsWith('http')) {
+      details.url = line
+      continue
+    }
+  }
+
+  return details
+}
+
 // Extract teams from fixture data based on source patterns
 export function extractTeams(summary: string, description: string, location?: string): { homeTeam: string; awayTeam: string; competition?: string } {
+  // Pattern 0: Assignr - parse the description for teams
+  const assignrDetails = parseAssignrDescription(description)
+  if (assignrDetails.homeTeam && assignrDetails.awayTeam) {
+    return {
+      homeTeam: assignrDetails.homeTeam,
+      awayTeam: assignrDetails.awayTeam,
+    }
+  }
+
   // Pattern 1: Vieira/RQ+ style - "Southwest Baptist at Maryville (MO) (12:00PM CDT)"
   // The description contains "Team A at Team B (time)"
   const atMatch = description.match(/^(.+?)\s+at\s+(.+?)\s*\(/)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { parseICS, webcalToHttps, extractTeams, extractRole, extractCompetition, cleanLocation } from '@/lib/ical-parser'
+import { parseICS, webcalToHttps, extractTeams, extractRole, extractCompetition, cleanLocation, parseAssignrDescription } from '@/lib/ical-parser'
 import type { SourceConnection } from '@/lib/supabase/database.types'
 
 export async function POST(request: NextRequest) {
@@ -110,6 +110,16 @@ export async function POST(request: NextRequest) {
       const competition = extractCompetition(fixture.summary || '')
       const location = cleanLocation(fixture.location || '')
 
+      // Parse Assignr-specific details from description
+      const assignrDetails = parseAssignrDescription(fixture.description || '')
+
+      // Build crew list from Assignr officials
+      const crewNames: string[] = []
+      if (assignrDetails.referee) crewNames.push(assignrDetails.referee)
+      if (assignrDetails.ar1 && assignrDetails.ar1 !== 'unassigned') crewNames.push(assignrDetails.ar1)
+      if (assignrDetails.ar2 && assignrDetails.ar2 !== 'unassigned') crewNames.push(assignrDetails.ar2)
+      if (assignrDetails.fourthOfficial && assignrDetails.fourthOfficial !== 'unassigned') crewNames.push(assignrDetails.fourthOfficial)
+
       // Ensure we have valid team names (required fields)
       const finalHomeTeam = homeTeam?.trim() || 'TBD'
       const finalAwayTeam = awayTeam?.trim() || 'TBD'
@@ -118,8 +128,10 @@ export async function POST(request: NextRequest) {
         tenant_id: source.tenant_id,
         user_id: user.id,
         source_name: source.name,
+        source_organisation: assignrDetails.organisation || null,
         source_record_id: fixture.uid,
         source_uid: fixture.uid,
+        source_url: assignrDetails.url || null,
         import_method: 'ical_feed',
         sport: 'soccer',
         competition,
@@ -127,6 +139,7 @@ export async function POST(request: NextRequest) {
         away_team: finalAwayTeam,
         appointment_status: 'confirmed' as const,
         role,
+        crew_names: crewNames.length > 0 ? crewNames : null,
         timezone: 'America/Chicago',
         kickoff_start: fixture.start.toISOString(),
         expected_match_end: fixture.end.toISOString(),
@@ -170,6 +183,7 @@ export async function POST(request: NextRequest) {
       fixtures: fixtures.slice(0, 5).map(f => ({
         uid: f.uid,
         summary: f.summary,
+        description: f.description?.slice(0, 100),
         start: f.start.toISOString(),
         end: f.end.toISOString(),
         location: f.location,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseICS, webcalToHttps } from '@/lib/ical-parser'
+import { parseICS, webcalToHttps, extractTeams, extractRole, parseAssignrDescription } from '@/lib/ical-parser'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,13 +39,26 @@ export async function POST(request: NextRequest) {
       url: httpsUrl,
       rawPreview: icsData.slice(0, 500),
       fixturesFound: fixtures.length,
-      fixtures: fixtures.slice(0, 5).map(f => ({
-        uid: f.uid,
-        summary: f.summary,
-        start: f.start.toISOString(),
-        end: f.end.toISOString(),
-        location: f.location,
-      })),
+      fixtures: fixtures.slice(0, 5).map(f => {
+        const teams = extractTeams(f.summary || '', f.description || '', f.location || '')
+        const role = extractRole(f.summary || '', f.description || '')
+        const assignr = parseAssignrDescription(f.description || '')
+        
+        return {
+          uid: f.uid,
+          summary: f.summary,
+          description: f.description?.slice(0, 200),
+          start: f.start.toISOString(),
+          end: f.end.toISOString(),
+          location: f.location,
+          parsed: {
+            homeTeam: teams.homeTeam,
+            awayTeam: teams.awayTeam,
+            role,
+            assignrDetails: assignr,
+          }
+        }
+      }),
     })
   } catch (error) {
     return NextResponse.json(
