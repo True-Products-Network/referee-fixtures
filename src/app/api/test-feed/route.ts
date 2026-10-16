@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
           parsed: {
             homeTeam: teams.homeTeam,
             awayTeam: teams.awayTeam,
+            competition: teams.competition,
             role,
             userRole,
             assignrDetails: assignr,

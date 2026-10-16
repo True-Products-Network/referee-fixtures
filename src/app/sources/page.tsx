@@ -46,6 +46,7 @@ interface TestResult {
       awayTeam: string
       role: string
       userRole: string
+      competition?: string
       assignrDetails?: any
       arbiterDetails?: any
     }
@@ -481,6 +482,9 @@ export default function SourcesPage() {
                             <p className="font-medium">{f.summary}</p>
                             {f.parsed && (
                               <>
+                                {f.parsed.competition && (
+                                  <p className="text-purple-600 font-medium">{f.parsed.competition}</p>
+                                )}
                                 <p className="text-blue-600">
                                   {f.parsed.homeTeam} vs {f.parsed.awayTeam}
                                 </p>

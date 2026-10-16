@@ -404,21 +404,23 @@ export function extractTeams(summary: string, description: string, location?: st
   if (isArbiterDescription(description)) {
     const arbiter = parseArbiterDescription(description)
     // Arbiter has: Sport + Level + Team (single team, not both home/away)
-    // Build event name from Level + Sport (e.g., "Women's Soccer")
-    const eventName = arbiter.level && arbiter.sport 
+    // Competition is Level + Sport (e.g., "Women's Soccer")
+    const competition = arbiter.level && arbiter.sport 
       ? `${arbiter.level} ${arbiter.sport}`
       : arbiter.sport || arbiter.level || ''
     
     if (arbiter.team) {
       return {
         homeTeam: arbiter.team,
-        awayTeam: eventName,
+        awayTeam: 'TBD',
+        competition,
       }
     }
-    if (eventName) {
+    if (competition) {
       return {
-        homeTeam: eventName,
+        homeTeam: competition,
         awayTeam: '',
+        competition,
       }
     }
   }
