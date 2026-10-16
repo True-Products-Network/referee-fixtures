@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
           uid: f.uid,
           summary: f.summary,
           description: f.description?.slice(0, 200),
+          descriptionRaw: f.description,
           start: f.start.toISOString(),
           end: f.end.toISOString(),
           location: f.location,

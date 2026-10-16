@@ -29,19 +29,13 @@ function parseDateTime(value: string, tzid?: string): Date {
     const tz = tzMatch[1]
     
     try {
-      // Create a date string that specifies the timezone properly
-      // Use toLocaleString to convert from tz time to local, then parse
-      // Format: "2026-10-17T11:00:00" in America/Chicago time
+      // Use Intl.DateTimeFormat to find the offset for this specific date
+      // Create a date object from the local time string
+      const localDate = new Date(dtStr)
       
-      // Strategy: Use the fact that Date.parse can handle ISO strings with offsets
-      // We need to find the offset for this specific date in this timezone
-      
-      // Create a date object assuming the dtStr is in the target timezone
-      // by using Intl to find the equivalent UTC time
-      const targetDate = new Date(dtStr + 'Z') // Start with UTC interpretation
-      
-      // Format the UTC date in the target timezone to see what time it shows
-      const formatter = new Intl.DateTimeFormat('en-US', {
+      // Format this date in the target timezone and in UTC
+      // Then compare to find the offset
+      const formatInTz = new Intl.DateTimeFormat('en-US', {
         timeZone: tz,
         year: 'numeric',
         month: '2-digit',
@@ -52,52 +46,44 @@ function parseDateTime(value: string, tzid?: string): Date {
         hour12: false,
       })
       
-      const parts = formatter.formatToParts(targetDate)
-      const getPart = (type: string) => parts.find(p => p.type === type)?.value || '00'
+      // Get the time in the target timezone when UTC is at our localDate
+      // Actually, we need to work backwards: we know the local time in tz,
+      // we need to find the equivalent UTC time
       
-      const formattedInTz = `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      // Approach: Use the fact that toLocaleString with timeZone converts FROM local TO tz
+      // We want the reverse: we have tz time, want UTC
       
-      // If formatting the UTC date in the target timezone gives us the expected time,
-      // then we got it right. If not, adjust.
-      // Actually, simpler approach: just construct an ISO string with the timezone
-      // and let the browser handle it
+      // Simple approach: try different offsets until toLocaleString matches
+      const targetTimeStr = dtStr // e.g. "2026-10-17T11:00:00"
       
-      // Best approach: Use the tz-aware string format that Date can parse
-      // "2026-10-17T11:00:00-05:00" for CDT or "-06:00" for CST
+      // Binary search for correct UTC time
+      // Start with a guess: assume it's UTC, then adjust
+      let guess = new Date(targetTimeStr + 'Z').getTime()
       
-      // Get offset by comparing UTC timestamp formatted in target tz vs actual UTC
-      const utcDate = new Date(dtStr + 'Z')
-      const utcTime = utcDate.getTime()
+      for (let iteration = 0; iteration < 5; iteration++) {
+        const guessDate = new Date(guess)
+        const formatted = formatInTz.format(guessDate)
+        
+        // Parse formatted back to compare
+        const formattedParts = formatInTz.formatToParts(guessDate)
+        const getPart = (type: string) => formattedParts.find(p => p.type === type)?.value || '00'
+        const formattedStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+        
+        if (formattedStr === targetTimeStr) {
+          // Found it!
+          return new Date(guess)
+        }
+        
+        // Calculate difference and adjust guess
+        const targetMs = new Date(targetTimeStr).getTime()
+        const formattedMs = new Date(formattedStr).getTime()
+        const diff = targetMs - formattedMs
+        
+        guess += diff
+      }
       
-      // Format UTC date in target timezone
-      const tzFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: tz,
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric',
-        second: 'numeric',
-        hour12: false,
-      })
-      
-      const tzParts = tzFormatter.formatToParts(utcDate)
-      const tzYear = parseInt(tzParts.find(p => p.type === 'year')?.value || '0')
-      const tzMonth = parseInt(tzParts.find(p => p.type === 'month')?.value || '0') - 1
-      const tzDay = parseInt(tzParts.find(p => p.type === 'day')?.value || '0')
-      const tzHour = parseInt(tzParts.find(p => p.type === 'hour')?.value || '0')
-      const tzMinute = parseInt(tzParts.find(p => p.type === 'minute')?.value || '0')
-      const tzSecond = parseInt(tzParts.find(p => p.type === 'second')?.value || '0')
-      
-      const tzTime = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMinute, tzSecond)
-      const offsetMs = tzTime - utcTime
-      const offsetHours = Math.abs(Math.floor(offsetMs / 3600000))
-      const offsetMinutes = Math.abs(Math.floor((offsetMs % 3600000) / 60000))
-      const offsetSign = offsetMs >= 0 ? '+' : '-'
-      const offsetStr = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`
-      
-      const isoStr = dtStr + offsetStr
-      return new Date(isoStr)
+      // If binary search didn't converge, return the best guess
+      return new Date(guess)
     } catch (e) {
       console.error('Timezone parsing error:', e)
     }
