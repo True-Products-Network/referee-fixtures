@@ -164,6 +164,42 @@ export default function CheckPage() {
     }
   }
 
+  const handleReject = async () => {
+    if (!result) return
+    setRecording(true)
+    try {
+      const res = await fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          home_team: 'TBD',
+          away_team: 'TBD',
+          kickoff_start: result.proposed.kickoff,
+          expected_match_end: result.proposed.departureTime,
+          required_arrival_time: result.proposed.arrivalTime,
+          appointment_status: 'declined',
+          payment_status: 'expected',
+          role,
+          venue_name: venue || null,
+          expected_gross_amount: fee ? parseFloat(fee) : null,
+          source_name: 'Manual',
+          import_method: 'manual_check_offer',
+          travel_time_before_minutes: result.travelToVenue,
+        }),
+      })
+
+      if (res.ok) {
+        setResult(null)
+        setVenue('')
+        setFee('')
+      }
+    } catch (err) {
+      console.error('Failed to record:', err)
+    } finally {
+      setRecording(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available': return 'bg-green-100 text-green-800 border-green-300'
@@ -418,27 +454,40 @@ export default function CheckPage() {
               </div>
 
               {/* Actions */}
-              {result.status !== 'unavailable' && (
-                <div className="flex gap-2 mt-4">
+              <div className="space-y-2 mt-4">
+                <p className="text-xs font-medium text-muted-foreground">What do you want to do?</p>
+                <div className="flex gap-2">
                   <Button
-                    variant="secondary"
+                    variant="outline"
                     className="flex-1"
                     size="sm"
                     onClick={handleRecordOffered}
                     disabled={recording}
+                    title="Save this game as 'offered' so you can decide later"
                   >
-                    {recording ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Record as Offered'}
+                    {recording ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save as Offered'}
                   </Button>
                   <Button
                     className="flex-1"
                     size="sm"
                     onClick={handleMarkAccepted}
                     disabled={recording}
+                    title="Accept this game - it goes on your calendar"
                   >
-                    {recording ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mark Accepted'}
+                    {recording ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accept'}
                   </Button>
                 </div>
-              )}
+                <Button
+                  variant="ghost"
+                  className="w-full text-red-500"
+                  size="sm"
+                  onClick={handleReject}
+                  disabled={recording}
+                  title="Decline this game - record it as declined"
+                >
+                  {recording ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Decline / Reject'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
