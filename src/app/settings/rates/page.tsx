@@ -170,7 +170,7 @@ export default function RatesPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select competition" />
                 </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
+                <SelectContent className="max-h-[200px] z-[100]">
                   {COMPETITION_TYPES.map(comp => (
                     <SelectItem key={comp} value={comp}>{comp}</SelectItem>
                   ))}
@@ -185,7 +185,7 @@ export default function RatesPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select age group (optional)" />
                 </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
+                <SelectContent className="max-h-[200px] z-[100]">
                   {AGE_GROUPS.map(age => (
                     <SelectItem key={age.value || 'none'} value={age.value}>{age.label}</SelectItem>
                   ))}
@@ -208,7 +208,7 @@ export default function RatesPage() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100]">
                     {ROLES.map(role => (
                       <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
                     ))}

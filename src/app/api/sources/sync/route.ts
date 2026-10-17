@@ -232,6 +232,19 @@ export async function POST(request: NextRequest) {
       const expectedMatchEnd = new Date(fixture.end.toISOString())
       const postMatchEnd = new Date(expectedMatchEnd.getTime() + postMatchBufferMs)
 
+      // Check if fixture already exists to preserve user-set fields like fees
+      const { data: existingFixture } = await supabase
+        .from('fixtures')
+        .select('id, expected_gross_amount, paid_amount, payment_status, appointment_status')
+        .eq('source_record_id', fixture.uid)
+        .single()
+
+      // Only set fee from rate card if fixture is new or doesn't have a fee yet
+      let finalFee = expectedFee
+      if (existingFixture?.expected_gross_amount && existingFixture.expected_gross_amount > 0) {
+        finalFee = existingFixture.expected_gross_amount
+      }
+
       const fixtureData = {
         tenant_id: source.tenant_id,
         user_id: user.id,
@@ -245,7 +258,7 @@ export async function POST(request: NextRequest) {
         competition,
         home_team: finalHomeTeam,
         away_team: finalAwayTeam,
-        appointment_status: 'confirmed' as const,
+        appointment_status: existingFixture?.appointment_status || 'confirmed' as const,
         role,
         crew_names: crewNames.length > 0 ? crewNames : null,
         timezone: 'America/Chicago',
@@ -254,8 +267,8 @@ export async function POST(request: NextRequest) {
         required_arrival_time: requiredArrivalTime.toISOString(),
         planned_departure_time: plannedDepartureTime.toISOString(),
         venue_name: location || null,
-        expected_gross_amount: expectedFee,
-        payment_status: 'expected',
+        expected_gross_amount: finalFee,
+        payment_status: existingFixture?.payment_status || 'expected',
         pre_match_buffer_minutes: arrivalRule.arrival_lead_minutes || 45,
         post_match_buffer_minutes: arrivalRule.post_match_buffer_minutes || 15,
       }
