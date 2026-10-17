@@ -144,15 +144,15 @@ export default function EarningsPage() {
       <header className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <h1 className="text-lg font-bold">Earnings</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-background rounded-lg px-2 py-1">
             {period !== 'all' && (
-              <Button variant="ghost" size="sm" onClick={() => navigatePeriod('prev')}>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigatePeriod('prev')}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
             )}
-            <span className="text-sm text-muted-foreground min-w-[100px] text-center">{range.label}</span>
+            <span className="text-sm text-muted-foreground min-w-[100px] text-center bg-background">{range.label}</span>
             {period !== 'all' && (
-              <Button variant="ghost" size="sm" onClick={() => navigatePeriod('next')}>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigatePeriod('next')}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
             )}
