@@ -23,50 +23,43 @@ const ROLES = [
   { value: 'fourth_official', label: '4th Official' },
 ]
 
-// Competition templates - user can select and customize
-const COMPETITION_TEMPLATES = [
-  // USSF Age Groups
-  'MLS Next U13',
-  'MLS Next U14',
-  'MLS Next U15',
-  'MLS Next U16',
-  'MLS Next U17',
-  'MLS Next U19',
-  'ECNL U13',
-  'ECNL U14',
-  'ECNL U15',
-  'ECNL U16',
-  'ECNL U17',
-  'ECNL U19',
-  'NPL U13',
-  'NPL U14',
-  'NPL U15',
-  'NPL U16',
-  'NPL U17',
-  'NPL U19',
-  // College
-  'College D1',
-  'College D2',
-  'College D3',
-  'JUCO',
-  'SLIAC',
-  'NAIA',
-  // High School
-  'High School Varsity',
-  'High School JV',
-  'High School Freshman',
-  // Adult/Club
+// Competition types (same as arrival rules)
+const COMPETITION_TYPES = [
+  'MLS Next',
+  'ECNL',
+  'NPL',
+  'High School',
+  'College',
   'Adult Amateur',
-  'Club Adult',
   'Youth Rec',
+]
+
+// Age groups
+const AGE_GROUPS = [
+  { value: '', label: 'No Age Group' },
+  { value: 'U13', label: 'U13' },
+  { value: 'U14', label: 'U14' },
+  { value: 'U15', label: 'U15' },
+  { value: 'U16', label: 'U16' },
+  { value: 'U17', label: 'U17' },
+  { value: 'U19', label: 'U19' },
+  { value: 'Varsity', label: 'Varsity' },
+  { value: 'JV', label: 'JV' },
+  { value: 'Freshman', label: 'Freshman' },
+  { value: 'D1', label: 'D1' },
+  { value: 'D2', label: 'D2' },
+  { value: 'D3', label: 'D3' },
+  { value: 'JUCO', label: 'JUCO' },
+  { value: 'SLIAC', label: 'SLIAC' },
+  { value: 'NAIA', label: 'NAIA' },
 ]
 
 export default function RatesPage() {
   const [rates, setRates] = useState<RateCard[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [competitionInput, setCompetitionInput] = useState('')
-  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [competitionType, setCompetitionType] = useState('')
+  const [ageGroup, setAgeGroup] = useState('')
   const [newRole, setNewRole] = useState('referee')
   const [newFee, setNewFee] = useState('')
 
@@ -88,8 +81,16 @@ export default function RatesPage() {
     fetchRates()
   }, [fetchRates])
 
+  function buildCompetitionName(): string {
+    if (!competitionType) return ''
+    if (ageGroup) {
+      return `${competitionType} ${ageGroup}`
+    }
+    return competitionType
+  }
+
   async function addRate() {
-    const competition = competitionInput.trim() || selectedTemplate
+    const competition = buildCompetitionName()
     if (!competition || !newFee) return
     
     setSaving(true)
@@ -105,8 +106,8 @@ export default function RatesPage() {
       })
 
       if (res.ok) {
-        setCompetitionInput('')
-        setSelectedTemplate('')
+        setCompetitionType('')
+        setAgeGroup('')
         setNewFee('')
         fetchRates()
       }
@@ -162,40 +163,52 @@ export default function RatesPage() {
             <CardTitle className="text-base">Add Rate</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Competition Type */}
             <div className="space-y-2">
               <Label>Competition Type</Label>
-              <Select value={selectedTemplate} onValueChange={(val) => {
-                setSelectedTemplate(val)
-                setCompetitionInput('')
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select template or type custom below" />
+              <Select value={competitionType} onValueChange={setCompetitionType}>
+                <SelectTrigger className="bg-white dark:bg-gray-900">
+                  <SelectValue placeholder="Select competition" />
                 </SelectTrigger>
-                <SelectContent>
-                  {COMPETITION_TEMPLATES.map(comp => (
+                <SelectContent className="bg-white dark:bg-gray-900 max-h-[200px]">
+                  {COMPETITION_TYPES.map(comp => (
                     <SelectItem key={comp} value={comp}>{comp}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Or type custom:</p>
-              <Input
-                value={competitionInput}
-                onChange={(e) => {
-                  setCompetitionInput(e.target.value)
-                  setSelectedTemplate('')
-                }}
-                placeholder="e.g., MLS Next U13 Boys"
-              />
             </div>
+
+            {/* Age Group */}
+            <div className="space-y-2">
+              <Label>Age Group / Division</Label>
+              <Select value={ageGroup} onValueChange={setAgeGroup}>
+                <SelectTrigger className="bg-white dark:bg-gray-900">
+                  <SelectValue placeholder="Select age group (optional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-gray-900 max-h-[200px]">
+                  {AGE_GROUPS.map(age => (
+                    <SelectItem key={age.value || 'none'} value={age.value}>{age.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Preview */}
+            {competitionType && (
+              <div className="bg-muted p-2 rounded text-sm">
+                <span className="text-muted-foreground">Will match: </span>
+                <span className="font-medium">{buildCompetitionName()}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Role</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white dark:bg-gray-900">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white dark:bg-gray-900">
                     {ROLES.map(role => (
                       <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
                     ))}
@@ -216,7 +229,7 @@ export default function RatesPage() {
             <Button 
               className="w-full" 
               onClick={addRate}
-              disabled={saving || (!competitionInput && !selectedTemplate) || !newFee}
+              disabled={saving || !competitionType || !newFee}
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
               Add Rate
