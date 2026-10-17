@@ -23,16 +23,41 @@ const ROLES = [
   { value: 'fourth_official', label: '4th Official' },
 ]
 
-const DEFAULT_COMPETITIONS = [
-  'MLS Next',
-  'ECNL',
-  'High School Varsity',
-  'High School JV',
+// Competition templates - user can select and customize
+const COMPETITION_TEMPLATES = [
+  // USSF Age Groups
+  'MLS Next U13',
+  'MLS Next U14',
+  'MLS Next U15',
+  'MLS Next U16',
+  'MLS Next U17',
+  'MLS Next U19',
+  'ECNL U13',
+  'ECNL U14',
+  'ECNL U15',
+  'ECNL U16',
+  'ECNL U17',
+  'ECNL U19',
+  'NPL U13',
+  'NPL U14',
+  'NPL U15',
+  'NPL U16',
+  'NPL U17',
+  'NPL U19',
+  // College
   'College D1',
   'College D2',
   'College D3',
+  'JUCO',
+  'SLIAC',
   'NAIA',
+  // High School
+  'High School Varsity',
+  'High School JV',
+  'High School Freshman',
+  // Adult/Club
   'Adult Amateur',
+  'Club Adult',
   'Youth Rec',
 ]
 
@@ -40,7 +65,8 @@ export default function RatesPage() {
   const [rates, setRates] = useState<RateCard[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [newCompetition, setNewCompetition] = useState('')
+  const [competitionInput, setCompetitionInput] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState('')
   const [newRole, setNewRole] = useState('referee')
   const [newFee, setNewFee] = useState('')
 
@@ -63,7 +89,8 @@ export default function RatesPage() {
   }, [fetchRates])
 
   async function addRate() {
-    if (!newCompetition || !newFee) return
+    const competition = competitionInput.trim() || selectedTemplate
+    if (!competition || !newFee) return
     
     setSaving(true)
     try {
@@ -71,14 +98,15 @@ export default function RatesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          competition_type: newCompetition,
+          competition_type: competition,
           role: newRole,
           fee_amount: parseFloat(newFee),
         }),
       })
 
       if (res.ok) {
-        setNewCompetition('')
+        setCompetitionInput('')
+        setSelectedTemplate('')
         setNewFee('')
         fetchRates()
       }
@@ -125,7 +153,7 @@ export default function RatesPage() {
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-4">
         <p className="text-sm text-muted-foreground">
-          Set your fees by competition and role. When fixtures sync, fees are auto-assigned.
+          Set exact fees by competition and role. Must match fixture competition exactly.
         </p>
 
         {/* Add New Rate */}
@@ -135,17 +163,29 @@ export default function RatesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label>Competition</Label>
-              <Select value={newCompetition} onValueChange={setNewCompetition}>
+              <Label>Competition Type</Label>
+              <Select value={selectedTemplate} onValueChange={(val) => {
+                setSelectedTemplate(val)
+                setCompetitionInput('')
+              }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select or type competition" />
+                  <SelectValue placeholder="Select template or type custom below" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DEFAULT_COMPETITIONS.map(comp => (
+                  {COMPETITION_TEMPLATES.map(comp => (
                     <SelectItem key={comp} value={comp}>{comp}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">Or type custom:</p>
+              <Input
+                value={competitionInput}
+                onChange={(e) => {
+                  setCompetitionInput(e.target.value)
+                  setSelectedTemplate('')
+                }}
+                placeholder="e.g., MLS Next U13 Boys"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -176,7 +216,7 @@ export default function RatesPage() {
             <Button 
               className="w-full" 
               onClick={addRate}
-              disabled={saving || !newCompetition || !newFee}
+              disabled={saving || (!competitionInput && !selectedTemplate) || !newFee}
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
               Add Rate
@@ -195,7 +235,7 @@ export default function RatesPage() {
               <CardContent className="p-6 text-center text-muted-foreground">
                 <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No rates set yet</p>
-                <p className="text-xs">Add rates above to auto-assign fees to fixtures</p>
+                <p className="text-xs">Add rates to auto-assign fees when fixtures sync</p>
               </CardContent>
             </Card>
           ) : (

@@ -204,15 +204,18 @@ export async function POST(request: NextRequest) {
       const arrivalRule = findArrivalRule(competition, role)
 
       // Find matching rate card for fee auto-assignment
+      // Uses EXACT match on competition_type so "MLS Next U13" != "MLS Next U14"
       let expectedFee: number | null = null
-      if (rateCards && rateCards.length > 0) {
+      if (rateCards && rateCards.length > 0 && competition && role) {
+        const normalizedComp = competition.trim().toLowerCase()
+        const normalizedRole = role.trim().toLowerCase()
+        
         const matchingRate = (rateCards as any[]).find((r: any) => {
-          const compMatch = !competition || 
-            competition.toLowerCase().includes(r.competition_type.toLowerCase()) ||
-            r.competition_type.toLowerCase().includes(competition.toLowerCase())
-          const roleMatch = !role || r.role === role
-          return compMatch && roleMatch
+          const rateComp = (r.competition_type || '').trim().toLowerCase()
+          const rateRole = (r.role || '').trim().toLowerCase()
+          return rateComp === normalizedComp && rateRole === normalizedRole
         })
+        
         if (matchingRate) {
           expectedFee = matchingRate.fee_amount
         }

@@ -13,7 +13,8 @@ import {
   Mail,
   MapPin,
   LogOut,
-  Loader2
+  Loader2,
+  DollarSign
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ const menuItems = [
     section: "Settings",
     items: [
       { label: "Profile & Travel", href: "/settings/profile", icon: Settings, description: "Home address, mileage rate" },
+      { label: "Rate Cards", href: "/settings/rates", icon: DollarSign, description: "Fees by competition and role" },
       { label: "Notifications", href: "/settings/notifications", icon: Bell, description: "Push, email preferences" },
       { label: "Arrival Rules", href: "/settings/rules", icon: Database, description: "Default times by competition" },
     ]
