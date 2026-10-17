@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateTravelWithCache, getDefaultTravelTime } from '@/lib/travel'
-import { addMinutes, differenceInMinutes, parseISO, format } from 'date-fns'
+import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns'
+import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
 interface CheckRequest {
   date: string
@@ -29,6 +30,18 @@ interface FixtureCheck {
 
 const DEFAULT_MATCH_DURATION = 90
 const MIN_GAP_MINUTES = 15
+const USER_TIMEZONE = 'America/Chicago'
+
+function parseLocalDateTime(dateStr: string, timeStr: string): Date {
+  // Parse as local time in user's timezone, return as UTC Date
+  const localString = `${dateStr}T${timeStr}:00`
+  return fromZonedTime(localString, USER_TIMEZONE)
+}
+
+function formatInUserTimezone(date: Date, fmt: string): string {
+  const zoned = toZonedTime(date, USER_TIMEZONE)
+  return format(zoned, fmt)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,8 +63,8 @@ export async function POST(request: NextRequest) {
     const body: CheckRequest = await request.json()
     const { date, kickoff, duration, arrivalLead, venue, role, fee } = body
 
-    // Build proposed fixture timeline
-    const proposedStart = parseISO(`${date}T${kickoff}`)
+    // Build proposed fixture timeline in UTC
+    const proposedStart = parseLocalDateTime(date, kickoff)
     const matchDuration = duration || DEFAULT_MATCH_DURATION
     const proposedEnd = addMinutes(proposedStart, matchDuration)
     const proposedArrival = addMinutes(proposedStart, -(arrivalLead || 45))
@@ -64,7 +77,7 @@ export async function POST(request: NextRequest) {
       if (result) travelToVenue = result.durationMinutes
     }
 
-    // Fetch existing fixtures for this date
+    // Fetch existing fixtures for this date (in UTC)
     const checkStart = addMinutes(proposedArrival, -240)
     const checkEnd = addMinutes(proposedDeparture, 240)
 
@@ -91,6 +104,7 @@ export async function POST(request: NextRequest) {
     let afterFixture: { time: string; venue: string; travelTime: number; distanceMiles: number | null } | undefined
 
     for (const fixture of activeFixtures) {
+      // Parse fixture times (stored as UTC in DB)
       const fixtureStart = parseISO(fixture.kickoff_start)
       const fixtureEnd = fixture.expected_match_end
         ? parseISO(fixture.expected_match_end)
@@ -111,7 +125,7 @@ export async function POST(request: NextRequest) {
       }
 
       const fixtureInfo = {
-        time: format(fixtureStart, 'h:mm a'),
+        time: formatInUserTimezone(fixtureStart, 'h:mm a'),
         venue: fixture.venue_name || 'Unknown venue',
         travelTime: travelBetween,
         distanceMiles: distanceBetween,
@@ -132,7 +146,7 @@ export async function POST(request: NextRequest) {
         const gap = differenceInMinutes(proposedArrival, fixtureDeparture)
         const requiredGap = travelBetween + MIN_GAP_MINUTES
 
-        if (!beforeFixture || gap < differenceInMinutes(proposedArrival, parseISO(beforeFixture.time))) {
+        if (!beforeFixture) {
           beforeFixture = fixtureInfo
         }
 
@@ -147,7 +161,7 @@ export async function POST(request: NextRequest) {
         const gap = differenceInMinutes(fixtureArrival, proposedDeparture)
         const requiredGap = travelBetween + MIN_GAP_MINUTES
 
-        if (!afterFixture || gap < differenceInMinutes(parseISO(afterFixture.time), proposedDeparture)) {
+        if (!afterFixture) {
           afterFixture = fixtureInfo
         }
 
