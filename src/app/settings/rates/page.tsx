@@ -167,10 +167,10 @@ export default function RatesPage() {
             <div className="space-y-2">
               <Label>Competition Type</Label>
               <Select value={competitionType} onValueChange={setCompetitionType}>
-                <SelectTrigger className="bg-white dark:bg-gray-900">
+                <SelectTrigger>
                   <SelectValue placeholder="Select competition" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-900 max-h-[200px]">
+                <SelectContent className="max-h-[200px]">
                   {COMPETITION_TYPES.map(comp => (
                     <SelectItem key={comp} value={comp}>{comp}</SelectItem>
                   ))}
@@ -182,10 +182,10 @@ export default function RatesPage() {
             <div className="space-y-2">
               <Label>Age Group / Division</Label>
               <Select value={ageGroup} onValueChange={setAgeGroup}>
-                <SelectTrigger className="bg-white dark:bg-gray-900">
+                <SelectTrigger>
                   <SelectValue placeholder="Select age group (optional)" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-900 max-h-[200px]">
+                <SelectContent className="max-h-[200px]">
                   {AGE_GROUPS.map(age => (
                     <SelectItem key={age.value || 'none'} value={age.value}>{age.label}</SelectItem>
                   ))}
@@ -205,10 +205,10 @@ export default function RatesPage() {
               <div className="space-y-2">
                 <Label>Role</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
-                  <SelectTrigger className="bg-white dark:bg-gray-900">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-900">
+                  <SelectContent>
                     {ROLES.map(role => (
                       <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
                     ))}
