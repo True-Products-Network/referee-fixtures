@@ -555,6 +555,42 @@ export interface Database {
         }
         Relationships: []
       }
+      rate_cards: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          competition_type: string
+          role: string
+          fee_amount: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          competition_type: string
+          role: string
+          fee_amount: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          competition_type?: string
+          role?: string
+          fee_amount?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

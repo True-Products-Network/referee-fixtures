@@ -92,6 +92,13 @@ export async function POST(request: NextRequest) {
       .eq('tenant_id', source.tenant_id)
       .order('arrival_lead_minutes', { ascending: false })
 
+    // Fetch rate cards for fee auto-assignment
+    const { data: rateCards } = await supabase
+      .from('rate_cards')
+      .select('*')
+      .eq('tenant_id', source.tenant_id)
+      .eq('is_active', true)
+
     // Default arrival rule
     const defaultRule = {
       arrival_lead_minutes: 45,
@@ -195,6 +202,21 @@ export async function POST(request: NextRequest) {
 
       // Find matching arrival rule
       const arrivalRule = findArrivalRule(competition, role)
+
+      // Find matching rate card for fee auto-assignment
+      let expectedFee: number | null = null
+      if (rateCards && rateCards.length > 0) {
+        const matchingRate = (rateCards as any[]).find((r: any) => {
+          const compMatch = !competition || 
+            competition.toLowerCase().includes(r.competition_type.toLowerCase()) ||
+            r.competition_type.toLowerCase().includes(competition.toLowerCase())
+          const roleMatch = !role || r.role === role
+          return compMatch && roleMatch
+        })
+        if (matchingRate) {
+          expectedFee = matchingRate.fee_amount
+        }
+      }
       
       // Calculate times based on arrival rule
       const kickoffDate = new Date(fixture.start.toISOString())
@@ -229,6 +251,7 @@ export async function POST(request: NextRequest) {
         required_arrival_time: requiredArrivalTime.toISOString(),
         planned_departure_time: plannedDepartureTime.toISOString(),
         venue_name: location || null,
+        expected_gross_amount: expectedFee,
         payment_status: 'expected',
         pre_match_buffer_minutes: arrivalRule.arrival_lead_minutes || 45,
         post_match_buffer_minutes: arrivalRule.post_match_buffer_minutes || 15,
