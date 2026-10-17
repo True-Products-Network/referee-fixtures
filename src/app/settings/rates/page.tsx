@@ -139,7 +139,7 @@ export default function RatesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+      <header className="sticky top-0 z-30 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
