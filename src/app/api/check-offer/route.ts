@@ -70,6 +70,13 @@ export async function POST(request: NextRequest) {
     const proposedArrival = addMinutes(proposedStart, -(arrivalLead || 45))
     const proposedDeparture = addMinutes(proposedEnd, 15)
 
+    console.log('CHECK-OFFER DEBUG:')
+    console.log('  Input:', date, kickoff)
+    console.log('  Proposed Start (UTC):', proposedStart.toISOString())
+    console.log('  Proposed Start (Local):', formatInUserTimezone(proposedStart, 'yyyy-MM-dd HH:mm:ss'))
+    console.log('  Proposed Arrival (UTC):', proposedArrival.toISOString())
+    console.log('  Proposed Departure (UTC):', proposedDeparture.toISOString())
+
     // Travel from home to proposed venue
     let travelToVenue = getDefaultTravelTime()
     if (homeAddress && venue) {
@@ -131,13 +138,20 @@ export async function POST(request: NextRequest) {
         distanceMiles: distanceBetween,
       }
 
+      console.log('  Fixture:', fixture.home_team, 'v', fixture.away_team)
+      console.log('    Start (UTC):', fixtureStart.toISOString(), 'Local:', formatInUserTimezone(fixtureStart, 'HH:mm'))
+      console.log('    Arrival (UTC):', fixtureArrival.toISOString(), 'Departure (UTC):', fixtureDeparture.toISOString())
+
       // OVERLAP CHECK: Does proposed fixture overlap with existing?
       const proposedOverlapsExisting = proposedArrival < fixtureDeparture && proposedDeparture > fixtureArrival
+
+      console.log('    Overlap check:', proposedArrival < fixtureDeparture, '&&', proposedDeparture > fixtureArrival, '=', proposedOverlapsExisting)
 
       if (proposedOverlapsExisting) {
         status = 'unavailable'
         reason = `Conflict: You have ${fixture.home_team} v ${fixture.away_team} at ${fixtureInfo.time} (${fixture.appointment_status})`
         conflictFixture = fixtureInfo
+        console.log('    -> CONFLICT!')
         break
       }
 
